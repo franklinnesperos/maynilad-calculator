@@ -160,7 +160,7 @@
             letter-spacing: 1px;
         }
 
-        /* Styling para sa Resibo na ise-save bilang Image */
+        /* Resibo template para sa Image Generation */
         .receipt-card {
             background: #ffffff;
             border: 2px dashed #0275d8;
@@ -169,7 +169,7 @@
             font-family: 'Courier New', Courier, monospace;
             color: #000;
             position: absolute;
-            left: -9999px; /* Itinatago sa screen hanggang sa i-download */
+            left: -9999px;
             top: 0;
         }
         .receipt-header {
@@ -225,11 +225,11 @@
     <div class="grid-2">
         <div class="form-group">
             <label>Dati (Previous):</label>
-            <input type="number" id="mainPrev" value="0" step="any" oninput="autoCalculateTotal()">
+            <input type="number" id="mainPrev" value="0" step="any">
         </div>
         <div class="form-group">
             <label>Kasalukuyan (Present):</label>
-            <input type="number" id="mainPres" value="100" step="any" oninput="autoCalculateTotal()">
+            <input type="number" id="mainPres" value="100" step="any">
         </div>
     </div>
 
@@ -278,7 +278,8 @@
         </div>
     </div>
 
-    <button class="btn-compute" onclick="computeBill()">KUMPYUTIN ANG BILL</button>
+    <!-- Siguraduhing may type="button" para gumana nang tuwiran ang click -->
+    <button type="button" class="btn-compute" onclick="computeBill()">KUMPYUTIN ANG BILL</button>
 
     <div class="result-box" id="resultBox">
         <h3 style="margin-top:0;">Resulta ng Kwentahan</h3>
@@ -324,57 +325,43 @@
 <script>
 let calculatedData = {};
 
-function autoCalculateTotal() {
-    let mainPrev = parseFloat(document.getElementById('mainPrev').value) || 0;
-    let mainPres = parseFloat(document.getElementById('mainPres').value) || 0;
-    let mainCuM = mainPres - mainPrev;
-    let rate = parseFloat(document.getElementById('ratePerCuMInput').value) || 45;
-    
-    if (mainCuM > 0) {
-        document.getElementById('totalBill').value = (mainCuM * rate).toFixed(2);
-    }
-}
-
 function computeBill() {
+    // Kunin ang mga values at lagyan ng default 0 kung sakaling may blangko
     let rate = parseFloat(document.getElementById('ratePerCuMInput').value) || 45;
     
-    // Main Meter
     let mainPrev = parseFloat(document.getElementById('mainPrev').value) || 0;
     let mainPres = parseFloat(document.getElementById('mainPres').value) || 0;
     let mainTotalCuM = mainPres - mainPrev;
 
-    // Submeter A (Agnes)
     let prevA = parseFloat(document.getElementById('prevA').value) || 0;
     let presA = parseFloat(document.getElementById('presA').value) || 0;
     let cuMA = presA - prevA;
 
-    // Submeter B (Ate Beth)
     let prevB = parseFloat(document.getElementById('prevB').value) || 0;
     let presB = parseFloat(document.getElementById('presB').value) || 0;
     let cuMB_gross = presB - prevB;
 
-    // Submeter C (Ate Edna Garden Submeter)
     let prevC = parseFloat(document.getElementById('prevC').value) || 0;
     let presC = parseFloat(document.getElementById('presC').value) || 0;
     let cuMC = presC - prevC;
 
-    // Submeter B Net (Binawas ang C dahil dumaan kay B)
+    // Submeter B Net (Binawas ang C)
     let netB = cuMB_gross - cuMC;
     if (netB < 0) netB = 0;
 
-    // Main Direct Line (Unmetered main line papunta sa bahay)
+    // Main Direct Line
     let mainDirect = mainTotalCuM - (cuMA + netB + cuMC);
     if (mainDirect < 0) mainDirect = 0;
 
-    // Ate Edna Total Household cu.m. (Direct Line + Submeter C)
+    // Ate Edna Total Household cu.m.
     let totalEdnaCuM = mainDirect + cuMC;
 
-    // Computations ng Babayaran
+    // Kompyutasyon ng Presyo
     let payA = cuMA * rate;
     let payB = netB * rate;
     let payEdna = totalEdnaCuM * rate;
 
-    // I-save ang data para magamit sa paggawa ng resibo
+    // I-save sa object para sa resibo
     calculatedData = {
         rate: rate,
         A: { name: "Sub-meter Agnes", prev: prevA, pres: presA, cum: cuMA, total: payA },
@@ -390,10 +377,56 @@ function computeBill() {
             <td>Sub-meter Agnes</td>
             <td>${cuMA.toFixed(1)} cu.m.</td>
             <td><strong>₱${payA.toFixed(2)}</strong></td>
-            <td><button class="btn-receipt" onclick="saveReceiptImage('A')">Save as Image</button></td>
+            <td><button type="button" class="btn-receipt" onclick="saveReceiptImage('A')">Save as Image</button></td>
         </tr>
         <tr>
             <td>Sub-meter Ate Beth (Net)</td>
             <td>${netB.toFixed(1)} cu.m.</td>
             <td><strong>₱${payB.toFixed(2)}</strong></td>
-            <td><button class="btn-receipt" onclick="saveReceiptImage('B')">Save as
+            <td><button type="button" class="btn-receipt" onclick="saveReceiptImage('B')">Save as Image</button></td>
+        </tr>
+        <tr style="background-color: #e2f0d9;">
+            <td><strong>Main Meter (Ate Edna)</strong></td>
+            <td><strong>${totalEdnaCuM.toFixed(1)} cu.m.</strong></td>
+            <td><strong>₱${payEdna.toFixed(2)}</strong></td>
+            <td><button type="button" class="btn-receipt" onclick="saveReceiptImage('Edna')">Save as Image</button></td>
+        </tr>
+    `;
+
+    document.getElementById('tableBody').innerHTML = html;
+    document.getElementById('resultBox').style.display = 'block';
+}
+
+function saveReceiptImage(key) {
+    let item = calculatedData[key];
+    if (!item) return;
+
+    let now = new Date();
+    let options = { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' };
+    let dateTimeString = now.toLocaleDateString('fil-PH', options);
+
+    document.getElementById('rDateTime').innerText = dateTimeString;
+    document.getElementById('rName').innerText = item.name;
+    document.getElementById('rRate').innerText = "₱" + calculatedData.rate.toFixed(2);
+    document.getElementById('rPrev').innerText = item.prev + " cu.m.";
+    document.getElementById('rPres').innerText = item.pres + " cu.m.";
+    document.getElementById('rCuM').innerText = item.cum.toFixed(1) + " cu.m.";
+    document.getElementById('rTotal').innerText = item.total.toFixed(2);
+
+    let receiptElement = document.getElementById('receiptCardToPrint');
+    receiptElement.style.left = '0';
+    receiptElement.style.top = '0';
+
+    html2canvas(receiptElement, { scale: 2 }).then(canvas => {
+        receiptElement.style.left = '-9999px';
+
+        let link = document.createElement('a');
+        link.download = `Resibo_${item.name.replace(/\s+/g, '_')}.png`;
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+    });
+}
+</script>
+
+</body>
+</html>
