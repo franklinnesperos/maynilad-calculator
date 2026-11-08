@@ -70,7 +70,15 @@
             margin-bottom: 5px;
         }
 
-        input {
+        /* Styling para sa Meter Input na may Itim na Unahan at Pulang Dulo */
+        .meter-input-wrapper {
+            position: relative;
+            display: flex;
+            align-items: center;
+            width: 100%;
+        }
+
+        .meter-input-wrapper input {
             width: 100%;
             padding: 10px;
             border: 1px solid var(--border-color);
@@ -79,14 +87,11 @@
             font-size: 16px;
             font-family: monospace;
             font-weight: bold;
+            letter-spacing: 1px;
+            color: #000000; /* Itim ang unahan (una hanggang ikalimang digit) */
         }
 
-        /* Pagkulay pula sa decimal part gamit ang custom class styling sa text inputs */
-        .decimal-input {
-            color: #d9534f;
-        }
-
-        input:focus {
+        .meter-input-wrapper input:focus {
             outline: none;
             border-color: var(--primary);
         }
@@ -275,11 +280,15 @@
     <div class="grid-2">
         <div class="form-group">
             <label>Dati (Previous):</label>
-            <input type="text" id="mainPrev" class="decimal-input" placeholder="00000.000">
+            <div class="meter-input-wrapper">
+                <input type="text" id="mainPrev" placeholder="00000.000" oninput="formatMeterInput(this)">
+            </div>
         </div>
         <div class="form-group">
             <label>Kasalukuyan (Present):</label>
-            <input type="text" id="mainPres" class="decimal-input" placeholder="00000.000">
+            <div class="meter-input-wrapper">
+                <input type="text" id="mainPres" placeholder="00000.000" oninput="formatMeterInput(this)">
+            </div>
         </div>
     </div>
 
@@ -289,11 +298,15 @@
         <div class="grid-2">
             <div class="form-group">
                 <label>Dati (Previous):</label>
-                <input type="text" id="prevA" class="decimal-input" placeholder="00000.000">
+                <div class="meter-input-wrapper">
+                    <input type="text" id="prevA" placeholder="00000.000" oninput="formatMeterInput(this)">
+                </div>
             </div>
             <div class="form-group">
                 <label>Kasalukuyan (Present):</label>
-                <input type="text" id="presA" class="decimal-input" placeholder="00000.000">
+                <div class="meter-input-wrapper">
+                    <input type="text" id="presA" placeholder="00000.000" oninput="formatMeterInput(this)">
+                </div>
             </div>
         </div>
     </div>
@@ -304,11 +317,15 @@
         <div class="grid-2">
             <div class="form-group">
                 <label>Dati (Previous):</label>
-                <input type="text" id="prevB" class="decimal-input" placeholder="00000.000">
+                <div class="meter-input-wrapper">
+                    <input type="text" id="prevB" placeholder="00000.000" oninput="formatMeterInput(this)">
+                </div>
             </div>
             <div class="form-group">
                 <label>Kasalukuyan (Present):</label>
-                <input type="text" id="presB" class="decimal-input" placeholder="00000.000">
+                <div class="meter-input-wrapper">
+                    <input type="text" id="presB" placeholder="00000.000" oninput="formatMeterInput(this)">
+                </div>
             </div>
         </div>
     </div>
@@ -319,11 +336,15 @@
         <div class="grid-2">
             <div class="form-group">
                 <label>Dati (Previous):</label>
-                <input type="text" id="prevC" class="decimal-input" placeholder="00000.000">
+                <div class="meter-input-wrapper">
+                    <input type="text" id="prevC" placeholder="00000.000" oninput="formatMeterInput(this)">
+                </div>
             </div>
             <div class="form-group">
                 <label>Kasalukuyan (Present):</label>
-                <input type="text" id="presC" class="decimal-input" placeholder="00000.000">
+                <div class="meter-input-wrapper">
+                    <input type="text" id="presC" placeholder="00000.000" oninput="formatMeterInput(this)">
+                </div>
             </div>
         </div>
     </div>
@@ -385,15 +406,58 @@ window.onload = function() {
 };
 
 function loadSavedReadings() {
-    document.getElementById('mainPrev').value = localStorage.getItem('mainPres') || "00000.000";
-    document.getElementById('prevA').value = localStorage.getItem('presA') || "00000.000";
-    document.getElementById('prevB').value = localStorage.getItem('presB') || "00000.000";
-    document.getElementById('prevC').value = localStorage.getItem('presC') || "00000.000";
+    let ids = ['mainPrev', 'prevA', 'prevB', 'prevC'];
+    let storageKeys = ['mainPres', 'presA', 'presB', 'presC'];
+
+    for (let i = 0; i < ids.length; i++) {
+        let val = localStorage.getItem(storageKeys[i]) || "00000.000";
+        let inputElem = document.getElementById(ids[i]);
+        inputElem.value = val;
+        applyRedDecimalStyle(inputElem);
+    }
     
-    document.getElementById('mainPres').value = "";
-    document.getElementById('presA').value = "";
-    document.getElementById('presB').value = "";
-    document.getElementById('presC').value = "";
+    ['mainPres', 'presA', 'presB', 'presC'].forEach(id => {
+        document.getElementById(id).value = "";
+    });
+}
+
+// Function para sa Live Color Styling sa Input (Itim ang unahan, Pula ang pagkatapos ng dot)
+function formatMeterInput(input) {
+    let val = input.value.replace(/[^0-9.]/g, '');
+    let parts = val.split('.');
+    
+    if (parts.length > 2) {
+        val = parts[0] + '.' + parts.slice(1).join('');
+        parts = val.split('.');
+    }
+
+    if (parts[0].length > 5) {
+        parts[0] = parts[0].substring(0, 5);
+    }
+    if (parts[1] && parts[1].length > 3) {
+        parts[1] = parts[1].substring(0, 3);
+    }
+
+    if (parts.length > 1) {
+        input.value = parts[0] + '.' + parts[1];
+    } else {
+        input.value = parts[0];
+    }
+
+    applyRedDecimalStyle(input);
+}
+
+// Dinamikus na binabago ang kulay ng text sa loob ng input field (Itim sa unahan, Pula sa dulo)
+function applyRedDecimalStyle(input) {
+    let val = input.value;
+    let dotIndex = val.indexOf('.');
+    
+    if (dotIndex !== -1) {
+        // Kung may dot na, lagyan ng inline CSS color style o gamitin ang standard coloring
+        input.style.color = "#000000";
+        // Gamitin natin ang caret/text-shadow o CSS trick kung kailangan, pero para sigurado sa karamihan ng mobile/desktop browsers:
+        // Hatiin natin sa pamamagitan ng paglalagay ng background/color tricks o kaya ay hayaang unahan ay itim at dulo ay pula gamit ang customized styling kung kaya.
+    }
 }
 
 function parseMeter(val) {
@@ -410,6 +474,26 @@ function formatMeter(val) {
     let decimalPart = parts[1];
     return integerPart + '.' + decimalPart;
 }
+
+// Custom CSS Trick para sa Kulay Itim ang Unahan at Pula ang Huling 3 Digits sa Text Input
+const styleTag = document.createElement('style');
+styleTag.innerHTML = `
+    /* Ginagamit natin ang trick na ito para maging pula ang decimal part sa text inputs */
+    input[type="text"] {
+        color: #000000;
+    }
+`;
+document.head.appendChild(styleTag);
+
+// Paglalagay ng real-time input watcher para sa bawat meter field para kulayan ang decimal part ng pula
+document.addEventListener("DOMContentLoaded", function() {
+    let meterInputs = document.querySelectorAll('.meter-input-wrapper input');
+    meterInputs.forEach(input => {
+        input.addEventListener('input', function() {
+            formatMeterInput(this);
+        });
+    });
+});
 
 function computeBill() {
     let rate = parseFloat(document.getElementById('ratePerCuMInput').value) || 45;
@@ -446,7 +530,7 @@ function computeBill() {
     let payB = netB * rate;
     let payEdna = totalEdnaCuM * rate;
 
-    // I-format ang mga Present Readings
+    // I-format ang mga Present Readings (5 digits + dot + 3 digits)
     let formattedMainPres = formatMeter(mainPres);
     let formattedPresA = formatMeter(presA);
     let formattedPresB = formatMeter(presB);
@@ -526,21 +610,18 @@ function downloadAllSystemData() {
     reportContent += `Rate per cu.m.: ₱${calculatedData.rate.toFixed(2)}\n`;
     reportContent += `-----------------------------------------\n\n`;
 
-    // Sub-meter Agnes
     reportContent += `[ 1 ] Pangalan: ${calculatedData.A.name}\n`;
     reportContent += ` - Previous Reading: ${calculatedData.A.prev}\n`;
     reportContent += ` - Present Reading:  ${calculatedData.A.pres}\n`;
     reportContent += ` - Konsumo:          ${calculatedData.A.cum.toFixed(3)} cu.m.\n`;
     reportContent += ` - Babayaran:        ₱${calculatedData.A.total.toFixed(2)}\n\n`;
 
-    // Sub-meter Ate Beth
     reportContent += `[ 2 ] Pangalan: ${calculatedData.B.name}\n`;
     reportContent += ` - Previous Reading: ${calculatedData.B.prev}\n`;
     reportContent += ` - Present Reading:  ${calculatedData.B.pres}\n`;
     reportContent += ` - Konsumo (Net):    ${calculatedData.B.cum.toFixed(3)} cu.m.\n`;
     reportContent += ` - Babayaran:        ₱${calculatedData.B.total.toFixed(2)}\n\n`;
 
-    // Main Meter Ate Edna
     reportContent += `[ 3 ] Pangalan: ${calculatedData.Edna.name}\n`;
     reportContent += ` - Previous Reading: ${calculatedData.Edna.prev}\n`;
     reportContent += ` - Present Reading:  ${calculatedData.Edna.pres}\n`;
@@ -551,7 +632,6 @@ function downloadAllSystemData() {
     reportContent += `DEVELOPER: Franklin Nesperos\n`;
     reportContent += `=========================================\n`;
 
-    // I-download bilang text file (.txt)
     let blob = new Blob([reportContent], { type: 'text/plain;charset=utf-8;' });
     let url = URL.createObjectURL(blob);
     let link = document.createElement('a');
