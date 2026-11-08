@@ -108,7 +108,6 @@
             border-color: var(--primary);
         }
 
-        /* Overlay para sa kulay itim sa unahan at pulang kulay mula sa tulok (.) pataas */
         .meter-overlay {
             position: absolute;
             left: 10px;
@@ -124,7 +123,6 @@
             overflow: hidden;
         }
 
-        /* Interactive Pop-up Numeric Keypad Box */
         .keypad-popup {
             position: fixed;
             bottom: 0;
@@ -547,10 +545,10 @@
         db.collection("water_system").doc("current_readings").get().then((doc) => {
             if (doc.exists) {
                 let data = doc.data();
-                setInputValue('mainPrev', data.mainPres || "00000.994");
-                setInputValue('prevA', data.presA || "10209.800");
-                setInputValue('prevB', data.presB || "00000.000");
-                setInputValue('prevC', data.presC || "00000.000");
+                setInputValue('mainPrev', data.mainPrev || "00000.994");
+                setInputValue('prevA', data.prevA || "10209.800");
+                setInputValue('prevB', data.prevB || "00000.000");
+                setInputValue('prevC', data.prevC || "00000.000");
                 
                 ['mainPres', 'presA', 'presB', 'presC'].forEach(id => setInputValue(id, ""));
 
@@ -574,7 +572,6 @@
         updateMeterDisplay(input);
     }
 
-    // Interactive Keypad Pop-up Handler
     function openKeypad(inputElem, isRate) {
         activeInput = inputElem;
         isRateInput = isRate;
@@ -610,7 +607,6 @@
         }
     }
 
-    // Live formatting para maging kulay pula ang lahat ng simula sa tulok (.) pataas kasama ang mga zero
     function updateMeterDisplay(input) {
         let val = input.value.replace(/[^0-9.]/g, '');
         let parts = val.split('.');
@@ -630,7 +626,7 @@
             let dotIdx = currentVal.indexOf('.');
             if (dotIdx !== -1) {
                 let integerPart = currentVal.substring(0, dotIdx);
-                let decimalPart = currentVal.substring(dotIdx); // Kasama ang dot at ang mga zero/numbers sa dulo
+                let decimalPart = currentVal.substring(dotIdx);
                 overlay.innerHTML = `<span style="color: transparent;">${integerPart}</span><span style="color: #d9534f;">${decimalPart}</span>`;
             } else {
                 overlay.innerHTML = "";
@@ -683,17 +679,27 @@
         let payB = netB * rate;
         let payEdna = totalEdnaCuM * rate;
 
+        let formattedMainPrev = formatMeter(mainPrev);
         let formattedMainPres = formatMeter(mainPres);
+        let formattedPrevA = formatMeter(prevA);
         let formattedPresA = formatMeter(presA);
+        let formattedPrevB = formatMeter(prevB);
         let formattedPresB = formatMeter(presB);
+        let formattedPrevC = formatMeter(prevC);
         let formattedPresC = formatMeter(presC);
 
         document.getElementById('syncStatus').innerText = "Nagse-save sa Cloud...";
+        
+        // Kapag nag-compute, ang present readings ngayon ang magiging previous readings sa susunod
         db.collection("water_system").doc("current_readings").set({
-            mainPres: formattedMainPres,
-            presA: formattedPresA,
-            presB: formattedPresB,
-            presC: formattedPresC,
+            mainPrev: formattedMainPres,
+            prevA: formattedPresA,
+            prevB: formattedPresB,
+            prevC: formattedPresC,
+            mainPres: "",
+            presA: "",
+            presB: "",
+            presC: "",
             updatedAt: new Date().toLocaleString('fil-PH')
         }).then(() => {
             document.getElementById('syncStatus').innerText = "✔ Tagumpay na na-sync sa Cloud Database!";
@@ -704,12 +710,10 @@
 
         calculatedData = {
             rate: rate,
-            A: { name: "Sub-meter Agnes", prev: formatMeter(prevA), pres: formattedPresA, cum: cuMA, total: payA },
-            B: { name: "Sub-meter Ate Beth", prev: formatMeter(prevB), pres: formattedPresB, cum: netB, total: payB },
-            Edna: { name: "Main Meter (Ate Edna)", prev: formatMeter(mainPrev), pres: formattedPresMainPres, cum: totalEdnaCuM, total: payEdna }
+            A: { name: "Sub-meter Agnes", prev: formattedPrevA, pres: formattedPresA, cum: cuMA, total: payA },
+            B: { name: "Sub-meter Ate Beth", prev: formattedPrevB, pres: formattedPresB, cum: netB, total: payB },
+            Edna: { name: "Main Meter (Ate Edna)", prev: formattedMainPrev, pres: formattedMainPres, cum: totalEdnaCuM, total: payEdna }
         };
-        // Ayusin ang object reference para sa Edna present reading
-        calculatedData.Edna.pres = formattedMainPres;
 
         document.getElementById('displayRate').innerText = "₱" + rate.toFixed(2);
         document.getElementById('totalBill').value = (mainTotalCuM * rate).toFixed(2);
@@ -743,16 +747,20 @@
         closeKeypad();
         if (confirm("Sigurado ka bang gusto mong i-reset ang cloud database sa default values?")) {
             db.collection("water_system").doc("current_readings").set({
-                mainPres: "00000.994",
-                presA: "10209.800",
-                presB: "00000.000",
-                presC: "00000.000",
+                mainPrev: "00000.994",
+                prevA: "10209.800",
+                prevB: "00000.000",
+                prevC: "00000.000",
+                mainPres: "",
+                presA: "",
+                presB: "",
+                presC: "",
                 updatedAt: new Date().toLocaleString('fil-PH')
             }).then(() => {
                 loadCloudReadings();
                 document.getElementById('totalBill').value = "";
                 document.getElementById('resultBox').style.display = 'none';
-                alert("Na-reset na ang cloud data para sa lahat!");
+                alert("Na-reset na ang cloud data sa default values!");
             });
         }
     }
