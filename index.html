@@ -10,6 +10,8 @@
         :root {
             --primary: #0275d8;
             --primary-hover: #025aa5;
+            --danger: #d9534f;
+            --danger-hover: #c9302c;
             --bg-color: #f4f7f6;
             --card-bg: #ffffff;
             --text-color: #333333;
@@ -88,6 +90,13 @@
             margin-bottom: 15px;
         }
 
+        .btn-group {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
         .btn-compute {
             width: 100%;
             background-color: var(--primary);
@@ -98,11 +107,26 @@
             font-size: 16px;
             cursor: pointer;
             font-weight: bold;
-            margin-top: 20px;
         }
 
         .btn-compute:hover {
             background-color: var(--primary-hover);
+        }
+
+        .btn-reset {
+            width: 100%;
+            background-color: var(--danger);
+            color: white;
+            padding: 14px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        .btn-reset:hover {
+            background-color: var(--danger-hover);
         }
 
         .result-box {
@@ -225,11 +249,11 @@
     <div class="grid-2">
         <div class="form-group">
             <label>Dati (Previous):</label>
-            <input type="number" id="mainPrev" value="0" step="any">
+            <input type="number" id="mainPrev" step="any">
         </div>
         <div class="form-group">
             <label>Kasalukuyan (Present):</label>
-            <input type="number" id="mainPres" value="100" step="any">
+            <input type="number" id="mainPres" step="any">
         </div>
     </div>
 
@@ -239,11 +263,11 @@
         <div class="grid-2">
             <div class="form-group">
                 <label>Dati (Previous):</label>
-                <input type="number" id="prevA" value="0" step="any">
+                <input type="number" id="prevA" step="any">
             </div>
             <div class="form-group">
                 <label>Kasalukuyan (Present):</label>
-                <input type="number" id="presA" value="10" step="any">
+                <input type="number" id="presA" step="any">
             </div>
         </div>
     </div>
@@ -254,11 +278,11 @@
         <div class="grid-2">
             <div class="form-group">
                 <label>Dati (Previous):</label>
-                <input type="number" id="prevB" value="0" step="any">
+                <input type="number" id="prevB" step="any">
             </div>
             <div class="form-group">
                 <label>Kasalukuyan (Present):</label>
-                <input type="number" id="presB" value="30" step="any">
+                <input type="number" id="presB" step="any">
             </div>
         </div>
     </div>
@@ -269,17 +293,19 @@
         <div class="grid-2">
             <div class="form-group">
                 <label>Dati (Previous):</label>
-                <input type="number" id="prevC" value="0" step="any">
+                <input type="number" id="prevC" step="any">
             </div>
             <div class="form-group">
                 <label>Kasalukuyan (Present):</label>
-                <input type="number" id="presC" value="20" step="any">
+                <input type="number" id="presC" step="any">
             </div>
         </div>
     </div>
 
-    <!-- Siguraduhing may type="button" para gumana nang tuwiran ang click -->
-    <button type="button" class="btn-compute" onclick="computeBill()">KUMPYUTIN ANG BILL</button>
+    <div class="btn-group">
+        <button type="button" class="btn-compute" onclick="computeBill()">KUMPYUTIN ANG BILL</button>
+        <button type="button" class="btn-reset" onclick="resetAllData()">RESET READINGS</button>
+    </div>
 
     <div class="result-box" id="resultBox">
         <h3 style="margin-top:0;">Resulta ng Kwentahan</h3>
@@ -325,8 +351,25 @@
 <script>
 let calculatedData = {};
 
+// I-load ang mga huling reading mula sa LocalStorage kapag binuksan ang pahina
+window.onload = function() {
+    loadSavedReadings();
+};
+
+function loadSavedReadings() {
+    document.getElementById('mainPrev').value = localStorage.getItem('mainPres') || 0;
+    document.getElementById('prevA').value = localStorage.getItem('presA') || 0;
+    document.getElementById('prevB').value = localStorage.getItem('presB') || 0;
+    document.getElementById('prevC').value = localStorage.getItem('presC') || 0;
+    
+    // Clear Present Fields for new entry
+    document.getElementById('mainPres').value = "";
+    document.getElementById('presA').value = "";
+    document.getElementById('presB').value = "";
+    document.getElementById('presC').value = "";
+}
+
 function computeBill() {
-    // Kunin ang mga values at lagyan ng default 0 kung sakaling may blangko
     let rate = parseFloat(document.getElementById('ratePerCuMInput').value) || 45;
     
     let mainPrev = parseFloat(document.getElementById('mainPrev').value) || 0;
@@ -360,6 +403,12 @@ function computeBill() {
     let payA = cuMA * rate;
     let payB = netB * rate;
     let payEdna = totalEdnaCuM * rate;
+
+    // AUTO-SAVE NG MGA PRESENT READING SA LOCALSTORAGE
+    localStorage.setItem('mainPres', mainPres);
+    localStorage.setItem('presA', presA);
+    localStorage.setItem('presB', presB);
+    localStorage.setItem('presC', presC);
 
     // I-save sa object para sa resibo
     calculatedData = {
@@ -395,6 +444,23 @@ function computeBill() {
 
     document.getElementById('tableBody').innerHTML = html;
     document.getElementById('resultBox').style.display = 'block';
+}
+
+function resetAllData() {
+    if (confirm("Sigurado ka bang gusto mong burahin ang lahat ng na-save na readings?")) {
+        localStorage.clear();
+        document.getElementById('mainPrev').value = 0;
+        document.getElementById('mainPres').value = "";
+        document.getElementById('prevA').value = 0;
+        document.getElementById('presA').value = "";
+        document.getElementById('prevB').value = 0;
+        document.getElementById('presB').value = "";
+        document.getElementById('prevC').value = 0;
+        document.getElementById('presC').value = "";
+        document.getElementById('totalBill').value = "";
+        document.getElementById('resultBox').style.display = 'none';
+        alert("Na-reset na ang lahat ng data!");
+    }
 }
 
 function saveReceiptImage(key) {
