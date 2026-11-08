@@ -12,6 +12,8 @@
             --primary-hover: #025aa5;
             --danger: #d9534f;
             --danger-hover: #c9302c;
+            --success: #28a745;
+            --success-hover: #218838;
             --bg-color: #f4f7f6;
             --card-bg: #ffffff;
             --text-color: #333333;
@@ -74,8 +76,14 @@
             border: 1px solid var(--border-color);
             border-radius: 6px;
             box-sizing: border-box;
-            font-size: 14px;
+            font-size: 16px;
             font-family: monospace;
+            font-weight: bold;
+        }
+
+        /* Pagkulay pula sa decimal part gamit ang custom class styling sa text inputs */
+        .decimal-input {
+            color: #d9534f;
         }
 
         input:focus {
@@ -93,7 +101,7 @@
 
         .btn-group {
             display: grid;
-            grid-template-columns: 2fr 1fr;
+            grid-template-columns: 1fr 1fr;
             gap: 10px;
             margin-top: 20px;
         }
@@ -128,6 +136,23 @@
 
         .btn-reset:hover {
             background-color: var(--danger-hover);
+        }
+
+        .btn-download-all {
+            width: 100%;
+            background-color: var(--success);
+            color: white;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            font-size: 15px;
+            cursor: pointer;
+            font-weight: bold;
+            margin-top: 15px;
+        }
+
+        .btn-download-all:hover {
+            background-color: var(--success-hover);
         }
 
         .result-box {
@@ -246,15 +271,15 @@
         </div>
     </div>
 
-    <div class="section-title">2. Main Meter Reading (Ate Edna) <span style="font-size:0.8em; color:#666; font-weight:normal;">(Format: 00000.000)</span></div>
+    <div class="section-title">2. Main Meter Reading (Ate Edna) <span style="font-size:0.8em; color:#666; font-weight:normal;">(00000<span style="color:#d9534f">.000</span>)</span></div>
     <div class="grid-2">
         <div class="form-group">
             <label>Dati (Previous):</label>
-            <input type="text" id="mainPrev" placeholder="00000.000">
+            <input type="text" id="mainPrev" class="decimal-input" placeholder="00000.000">
         </div>
         <div class="form-group">
             <label>Kasalukuyan (Present):</label>
-            <input type="text" id="mainPres" placeholder="00000.000">
+            <input type="text" id="mainPres" class="decimal-input" placeholder="00000.000">
         </div>
     </div>
 
@@ -264,11 +289,11 @@
         <div class="grid-2">
             <div class="form-group">
                 <label>Dati (Previous):</label>
-                <input type="text" id="prevA" placeholder="00000.000">
+                <input type="text" id="prevA" class="decimal-input" placeholder="00000.000">
             </div>
             <div class="form-group">
                 <label>Kasalukuyan (Present):</label>
-                <input type="text" id="presA" placeholder="00000.000">
+                <input type="text" id="presA" class="decimal-input" placeholder="00000.000">
             </div>
         </div>
     </div>
@@ -279,11 +304,11 @@
         <div class="grid-2">
             <div class="form-group">
                 <label>Dati (Previous):</label>
-                <input type="text" id="prevB" placeholder="00000.000">
+                <input type="text" id="prevB" class="decimal-input" placeholder="00000.000">
             </div>
             <div class="form-group">
                 <label>Kasalukuyan (Present):</label>
-                <input type="text" id="presB" placeholder="00000.000">
+                <input type="text" id="presB" class="decimal-input" placeholder="00000.000">
             </div>
         </div>
     </div>
@@ -294,11 +319,11 @@
         <div class="grid-2">
             <div class="form-group">
                 <label>Dati (Previous):</label>
-                <input type="text" id="prevC" placeholder="00000.000">
+                <input type="text" id="prevC" class="decimal-input" placeholder="00000.000">
             </div>
             <div class="form-group">
                 <label>Kasalukuyan (Present):</label>
-                <input type="text" id="presC" placeholder="00000.000">
+                <input type="text" id="presC" class="decimal-input" placeholder="00000.000">
             </div>
         </div>
     </div>
@@ -324,6 +349,9 @@
             <tbody id="tableBody">
             </tbody>
         </table>
+
+        <!-- Button para i-download ang buong data ng sistema -->
+        <button type="button" class="btn-download-all" onclick="downloadAllSystemData()">DOWNLOAD ALL SYSTEM DATA (.TXT)</button>
     </div>
 
     <div class="footer">
@@ -370,7 +398,6 @@ function loadSavedReadings() {
 
 function parseMeter(val) {
     if (!val) return 0;
-    // Siguraduhing decimal number ang kinukuha para sa tamang kumpyutasyon
     let num = parseFloat(val.trim());
     return isNaN(num) ? 0 : num;
 }
@@ -379,36 +406,28 @@ function formatMeter(val) {
     let num = parseFloat(val);
     if (isNaN(num)) num = 0;
     let parts = num.toFixed(3).split('.');
-    let integerPart = parts[0].padStart(5, '0'); // 5 digits sa unahan na may zero padding
-    let decimalPart = parts[1]; // 3 digits sa sunod
+    let integerPart = parts[0].padStart(5, '0');
+    let decimalPart = parts[1];
     return integerPart + '.' + decimalPart;
 }
 
 function computeBill() {
     let rate = parseFloat(document.getElementById('ratePerCuMInput').value) || 45;
     
-    let mainPrevStr = document.getElementById('mainPrev').value;
-    let mainPresStr = document.getElementById('mainPres').value;
-    let mainPrev = parseMeter(mainPrevStr);
-    let mainPres = parseMeter(mainPresStr);
+    let mainPrev = parseMeter(document.getElementById('mainPrev').value);
+    let mainPres = parseMeter(document.getElementById('mainPres').value);
     let mainTotalCuM = mainPres - mainPrev;
 
-    let prevAStr = document.getElementById('prevA').value;
-    let presAStr = document.getElementById('presA').value;
-    let prevA = parseMeter(prevAStr);
-    let presA = parseMeter(presAStr);
+    let prevA = parseMeter(document.getElementById('prevA').value);
+    let presA = parseMeter(document.getElementById('presA').value);
     let cuMA = presA - prevA;
 
-    let prevBStr = document.getElementById('prevB').value;
-    let presBStr = document.getElementById('presB').value;
-    let prevB = parseMeter(prevBStr);
-    let presB = parseMeter(presBStr);
+    let prevB = parseMeter(document.getElementById('prevB').value);
+    let presB = parseMeter(document.getElementById('presB').value);
     let cuMB_gross = presB - prevB;
 
-    let prevCStr = document.getElementById('prevC').value;
-    let presCStr = document.getElementById('presC').value;
-    let prevC = parseMeter(prevCStr);
-    let presC = parseMeter(presCStr);
+    let prevC = parseMeter(document.getElementById('prevC').value);
+    let presC = parseMeter(document.getElementById('presC').value);
     let cuMC = presC - prevC;
 
     // Submeter B Net (Binawas ang C)
@@ -427,13 +446,13 @@ function computeBill() {
     let payB = netB * rate;
     let payEdna = totalEdnaCuM * rate;
 
-    // I-format ang mga Present Readings para panatilihin ang 5 digits + dot + 3 digits format
+    // I-format ang mga Present Readings
     let formattedMainPres = formatMeter(mainPres);
     let formattedPresA = formatMeter(presA);
     let formattedPresB = formatMeter(presB);
     let formattedPresC = formatMeter(presC);
 
-    // AUTO-SAVE SA LOCALSTORAGE (Awtomatikong magiging Previous sa susunod)
+    // AUTO-SAVE SA LOCALSTORAGE
     localStorage.setItem('mainPres', formattedMainPres);
     localStorage.setItem('presA', formattedPresA);
     localStorage.setItem('presB', formattedPresB);
@@ -489,6 +508,57 @@ function resetAllData() {
         document.getElementById('resultBox').style.display = 'none';
         alert("Na-reset na ang lahat ng data!");
     }
+}
+
+function downloadAllSystemData() {
+    if (!calculatedData.A || !calculatedData.B || !calculatedData.Edna) {
+        alert("Paki-kumpyutin muna ang bill bago i-download ang data.");
+        return;
+    }
+
+    let now = new Date();
+    let dateTimeString = now.toLocaleString('fil-PH');
+
+    let reportContent = `=========================================\n`;
+    reportContent += `   MAYNILAD WATER BILL SYSTEM REPORT\n`;
+    reportContent += `=========================================\n`;
+    reportContent += `Petsa at Oras: ${dateTimeString}\n`;
+    reportContent += `Rate per cu.m.: ₱${calculatedData.rate.toFixed(2)}\n`;
+    reportContent += `-----------------------------------------\n\n`;
+
+    // Sub-meter Agnes
+    reportContent += `[ 1 ] Pangalan: ${calculatedData.A.name}\n`;
+    reportContent += ` - Previous Reading: ${calculatedData.A.prev}\n`;
+    reportContent += ` - Present Reading:  ${calculatedData.A.pres}\n`;
+    reportContent += ` - Konsumo:          ${calculatedData.A.cum.toFixed(3)} cu.m.\n`;
+    reportContent += ` - Babayaran:        ₱${calculatedData.A.total.toFixed(2)}\n\n`;
+
+    // Sub-meter Ate Beth
+    reportContent += `[ 2 ] Pangalan: ${calculatedData.B.name}\n`;
+    reportContent += ` - Previous Reading: ${calculatedData.B.prev}\n`;
+    reportContent += ` - Present Reading:  ${calculatedData.B.pres}\n`;
+    reportContent += ` - Konsumo (Net):    ${calculatedData.B.cum.toFixed(3)} cu.m.\n`;
+    reportContent += ` - Babayaran:        ₱${calculatedData.B.total.toFixed(2)}\n\n`;
+
+    // Main Meter Ate Edna
+    reportContent += `[ 3 ] Pangalan: ${calculatedData.Edna.name}\n`;
+    reportContent += ` - Previous Reading: ${calculatedData.Edna.prev}\n`;
+    reportContent += ` - Present Reading:  ${calculatedData.Edna.pres}\n`;
+    reportContent += ` - Konsumo (Total):  ${calculatedData.Edna.cum.toFixed(3)} cu.m.\n`;
+    reportContent += ` - Babayaran:        ₱${calculatedData.Edna.total.toFixed(2)}\n\n`;
+
+    reportContent += `-----------------------------------------\n`;
+    reportContent += `DEVELOPER: Franklin Nesperos\n`;
+    reportContent += `=========================================\n`;
+
+    // I-download bilang text file (.txt)
+    let blob = new Blob([reportContent], { type: 'text/plain;charset=utf-8;' });
+    let url = URL.createObjectURL(blob);
+    let link = document.createElement('a');
+    link.href = url;
+    link.download = `Maynilad_System_Report_${now.toISOString().slice(0,10)}.txt`;
+    link.click();
+    URL.revokeObjectURL(url);
 }
 
 function saveReceiptImage(key) {
