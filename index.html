@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Maynilad Water Bill Calculator</title>
+    <!-- html2canvas library para sa Save as Image feature -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <style>
         :root {
             --primary: #0275d8;
@@ -137,11 +139,12 @@
             background: #28a745;
             color: white;
             border: none;
-            padding: 6px 12px;
+            padding: 6px 10px;
             border-radius: 4px;
             cursor: pointer;
             font-weight: bold;
             font-size: 0.85em;
+            margin-right: 5px;
         }
 
         .btn-receipt:hover {
@@ -157,31 +160,47 @@
             letter-spacing: 1px;
         }
 
-        /* Printable Receipt Styles */
-        @media print {
-            body * {
-                visibility: hidden;
-            }
-            #printableReceipt, #printableReceipt * {
-                visibility: visible;
-            }
-            #printableReceipt {
-                position: absolute;
-                left: 0;
-                top: 0;
-                width: 100%;
-                padding: 20px;
-            }
+        /* Styling para sa Resibo na ise-save bilang Image */
+        .receipt-card {
+            background: #ffffff;
+            border: 2px dashed #0275d8;
+            padding: 25px;
+            width: 350px;
+            font-family: 'Courier New', Courier, monospace;
+            color: #000;
+            position: absolute;
+            left: -9999px; /* Itinatago sa screen hanggang sa i-download */
+            top: 0;
         }
-
-        .receipt-template {
-            display: none;
-            border: 2px dashed #333;
-            padding: 20px;
-            max-width: 400px;
-            margin: 20px auto;
-            background: #fff;
-            font-family: monospace;
+        .receipt-header {
+            text-align: center;
+            font-weight: bold;
+            font-size: 1.1em;
+            margin-bottom: 10px;
+        }
+        .receipt-divider {
+            border-top: 1px dashed #000;
+            margin: 10px 0;
+        }
+        .receipt-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 6px 0;
+            font-size: 0.95em;
+        }
+        .receipt-total {
+            font-size: 1.2em;
+            font-weight: bold;
+            text-align: center;
+            margin-top: 15px;
+            background: #f0f0f0;
+            padding: 8px;
+        }
+        .receipt-footer {
+            text-align: center;
+            font-size: 0.8em;
+            margin-top: 15px;
+            color: #555;
         }
     </style>
 </head>
@@ -198,7 +217,7 @@
         </div>
         <div class="form-group">
             <label>Total Maynilad Bill (₱) (Optional):</label>
-            <input type="number" id="totalBill" placeholder="Kusa itong lalabas o manu-mano" step="any">
+            <input type="number" id="totalBill" placeholder="Kusa itong lalabas" step="any" readonly>
         </div>
     </div>
 
@@ -206,11 +225,11 @@
     <div class="grid-2">
         <div class="form-group">
             <label>Dati (Previous):</label>
-            <input type="number" id="mainPrev" value="0" step="any" oninput="autoCalculateCuM()">
+            <input type="number" id="mainPrev" value="0" step="any" oninput="autoCalculateTotal()">
         </div>
         <div class="form-group">
             <label>Kasalukuyan (Present):</label>
-            <input type="number" id="mainPres" value="100" step="any" oninput="autoCalculateCuM()">
+            <input type="number" id="mainPres" value="100" step="any" oninput="autoCalculateTotal()">
         </div>
     </div>
 
@@ -220,11 +239,11 @@
         <div class="grid-2">
             <div class="form-group">
                 <label>Dati (Previous):</label>
-                <input type="number" id="prevA" value="0" step="any" oninput="autoCalculateCuM()">
+                <input type="number" id="prevA" value="0" step="any">
             </div>
             <div class="form-group">
                 <label>Kasalukuyan (Present):</label>
-                <input type="number" id="presA" value="10" step="any" oninput="autoCalculateCuM()">
+                <input type="number" id="presA" value="10" step="any">
             </div>
         </div>
     </div>
@@ -235,11 +254,11 @@
         <div class="grid-2">
             <div class="form-group">
                 <label>Dati (Previous):</label>
-                <input type="number" id="prevB" value="0" step="any" oninput="autoCalculateCuM()">
+                <input type="number" id="prevB" value="0" step="any">
             </div>
             <div class="form-group">
                 <label>Kasalukuyan (Present):</label>
-                <input type="number" id="presB" value="30" step="any" oninput="autoCalculateCuM()">
+                <input type="number" id="presB" value="30" step="any">
             </div>
         </div>
     </div>
@@ -250,11 +269,11 @@
         <div class="grid-2">
             <div class="form-group">
                 <label>Dati (Previous):</label>
-                <input type="number" id="prevC" value="0" step="any" oninput="autoCalculateCuM()">
+                <input type="number" id="prevC" value="0" step="any">
             </div>
             <div class="form-group">
                 <label>Kasalukuyan (Present):</label>
-                <input type="number" id="presC" value="20" step="any" oninput="autoCalculateCuM()">
+                <input type="number" id="presC" value="20" step="any">
             </div>
         </div>
     </div>
@@ -271,7 +290,7 @@
                     <th>Pangalan</th>
                     <th>Net cu.m.</th>
                     <th>Babayaran (₱)</th>
-                    <th>Resibo</th>
+                    <th>Aksyon (Resibo)</th>
                 </tr>
             </thead>
             <tbody id="tableBody">
@@ -284,29 +303,34 @@
     </div>
 </div>
 
-<!-- Receipt Modal/Container for Printing -->
-<div id="printableReceipt" class="receipt-template">
-    <h3 style="text-align:center; margin-bottom:5px;">WATER BILL RECEIPT</h3>
-    <hr>
-    <p><strong>Pangalan:</strong> <span id="rName"></span></p>
-    <p><strong>Rate / cu.m.:</strong> ₱<span id="rRate"></span></p>
-    <p><strong>Previous Reading:</strong> <span id="rPrev"></span> cu.m.</p>
-    <p><strong>Present Reading:</strong> <span id="rPres"></span> cu.m.</p>
-    <p><strong>Total Consumption:</strong> <span id="rCuM"></span> cu.m.</p>
-    <hr>
-    <h2 style="text-align:center; margin:10px 0;">KABUUAN: ₱<span id="rTotal"></span></h2>
-    <hr>
-    <p style="text-align:center; font-size:0.8em; margin-top:15px;">Salamat sa pagbabayad!<br>Developer: Franklin Nesperos</p>
+<!-- Naka-hidden na Resibo Template para sa html2canvas Image Generation -->
+<div id="receiptCardToPrint" class="receipt-card">
+    <div class="receipt-header">MAYNILAD WATER BILL RECEIPT</div>
+    <div style="text-align: center; font-size: 0.85em;" id="rDateTime"></div>
+    <div class="receipt-divider"></div>
+    <div class="receipt-row"><span>Pangalan:</span> <strong id="rName"></strong></div>
+    <div class="receipt-row"><span>Rate / cu.m.:</span> <span id="rRate"></span></div>
+    <div class="receipt-row"><span>Previous Reading:</span> <span id="rPrev"></span></div>
+    <div class="receipt-row"><span>Present Reading:</span> <span id="rPres"></span></div>
+    <div class="receipt-row"><span>Consumption:</span> <strong id="rCuM"></strong></div>
+    <div class="receipt-divider"></div>
+    <div class="receipt-total">KABUUAN: ₱<span id="rTotal"></span></div>
+    <div class="receipt-footer">
+        Salamat sa pagbabayad!<br>
+        <strong>Developer: Franklin Nesperos</strong>
+    </div>
 </div>
 
 <script>
 let calculatedData = {};
 
-function autoCalculateCuM() {
-    let mainCuM = (parseFloat(document.getElementById('mainPres').value) || 0) - (parseFloat(document.getElementById('mainPrev').value) || 0);
-    let rate = parseFloat(document.getElementById('ratePerCuMInput').value) || 0;
+function autoCalculateTotal() {
+    let mainPrev = parseFloat(document.getElementById('mainPrev').value) || 0;
+    let mainPres = parseFloat(document.getElementById('mainPres').value) || 0;
+    let mainCuM = mainPres - mainPrev;
+    let rate = parseFloat(document.getElementById('ratePerCuMInput').value) || 45;
     
-    if (mainCuM > 0 && rate > 0) {
+    if (mainCuM > 0) {
         document.getElementById('totalBill').value = (mainCuM * rate).toFixed(2);
     }
 }
@@ -334,23 +358,23 @@ function computeBill() {
     let presC = parseFloat(document.getElementById('presC').value) || 0;
     let cuMC = presC - prevC;
 
-    // Submeter B Net
+    // Submeter B Net (Binawas ang C dahil dumaan kay B)
     let netB = cuMB_gross - cuMC;
     if (netB < 0) netB = 0;
 
-    // Main Direct Line
+    // Main Direct Line (Unmetered main line papunta sa bahay)
     let mainDirect = mainTotalCuM - (cuMA + netB + cuMC);
     if (mainDirect < 0) mainDirect = 0;
 
     // Ate Edna Total Household cu.m. (Direct Line + Submeter C)
     let totalEdnaCuM = mainDirect + cuMC;
 
-    // Computations
+    // Computations ng Babayaran
     let payA = cuMA * rate;
     let payB = netB * rate;
     let payEdna = totalEdnaCuM * rate;
 
-    // Store Data for Receipts
+    // I-save ang data para magamit sa paggawa ng resibo
     calculatedData = {
         rate: rate,
         A: { name: "Sub-meter Agnes", prev: prevA, pres: presA, cum: cuMA, total: payA },
@@ -359,49 +383,17 @@ function computeBill() {
     };
 
     document.getElementById('displayRate').innerText = "₱" + rate.toFixed(2);
+    document.getElementById('totalBill').value = (mainTotalCuM * rate).toFixed(2);
 
     let html = `
         <tr>
             <td>Sub-meter Agnes</td>
             <td>${cuMA.toFixed(1)} cu.m.</td>
             <td><strong>₱${payA.toFixed(2)}</strong></td>
-            <td><button class="btn-receipt" onclick="printReceipt('A')">Print / Save</button></td>
+            <td><button class="btn-receipt" onclick="saveReceiptImage('A')">Save as Image</button></td>
         </tr>
         <tr>
             <td>Sub-meter Ate Beth (Net)</td>
             <td>${netB.toFixed(1)} cu.m.</td>
             <td><strong>₱${payB.toFixed(2)}</strong></td>
-            <td><button class="btn-receipt" onclick="printReceipt('B')">Print / Save</button></td>
-        </tr>
-        <tr style="background-color: #e2f0d9;">
-            <td><strong>Main Meter (Ate Edna)</strong></td>
-            <td><strong>${totalEdnaCuM.toFixed(1)} cu.m.</strong></td>
-            <td><strong>₱${payEdna.toFixed(2)}</strong></td>
-            <td><button class="btn-receipt" onclick="printReceipt('Edna')">Print / Save</button></td>
-        </tr>
-    `;
-
-    document.getElementById('tableBody').innerHTML = html;
-    document.getElementById('resultBox').style.display = 'block';
-}
-
-function printReceipt(key) {
-    let item = calculatedData[key];
-    if (!item) return;
-
-    document.getElementById('rName').innerText = item.name;
-    document.getElementById('rRate').innerText = calculatedData.rate.toFixed(2);
-    document.getElementById('rPrev').innerText = item.prev;
-    document.getElementById('rPres').innerText = item.pres;
-    document.getElementById('rCuM').innerText = item.cum.toFixed(1);
-    document.getElementById('rTotal').innerText = item.total.toFixed(2);
-
-    let receiptElem = document.getElementById('printableReceipt');
-    receiptElem.style.display = 'block';
-    window.print();
-    receiptElem.style.display = 'none';
-}
-</script>
-
-</body>
-</html>
+            <td><button class="btn-receipt" onclick="saveReceiptImage('B')">Save as
