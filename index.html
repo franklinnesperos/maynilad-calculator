@@ -7,9 +7,396 @@
     <!-- html2canvas library para sa Save as Image feature -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     
-    <!-- Firebase App & Firestore SDKs -->
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <!-- Firebase App & Firestore SDKs (Modular v10) -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyD8kZ7TJ8_8h2kZ82HaXU4LHTpfzMzy23g",
+            authDomain: "maynilad-calculator.firebaseapp.com",
+            projectId: "maynilad-calculator",
+            storageBucket: "maynilad-calculator.firebasestorage.app",
+            messagingSenderId: "236444881363",
+            appId: "1:236444881363:web:00d1ca915629a2fc7cc826"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        let calculatedData = {};
+        let activeInput = null;
+        let isRateInput = false;
+        let rawDigits = "00000000"; 
+        
+        let enteredPin = "";
+        const CORRECT_PIN = "082707";
+
+        window.onload = function() {
+            loadCloudReadings();
+        };
+
+        async function loadCloudReadings() {
+            try {
+                const docRef = doc(db, "water_system", "current_readings");
+                const docSnap = await getDoc(docRef);
+                
+                if (docSnap.exists()) {
+                    let data = docSnap.data();
+                    setInputValue('mainPrev', data.mainPrev || "00000.994");
+                    setInputValue('prevA', data.prevA || "10209.800");
+                    setInputValue('prevB', data.prevB || "00000.000");
+                    setInputValue('prevC', data.prevC || "00000.000");
+                    
+                    ['mainPres', 'presA', 'presB', 'presC'].forEach(id => setInputValue(id, "00000.000"));
+
+                    document.getElementById('syncStatus').innerText = "✔ Nakakonekta sa Cloud (Real-time Sync Active)";
+                } else {
+                    setInputValue('mainPrev', "00000.994");
+                    setInputValue('prevA', "10209.800");
+                    setInputValue('prevB', "00000.000");
+                    setInputValue('prevC', "00000.000");
+                    document.getElementById('syncStatus').innerText = "✔ Handa na sa Cloud Database";
+                }
+            } catch (error) {
+                console.error("Error loading cloud data:", error);
+                document.getElementById('syncStatus').innerText = "⚠ May problema sa koneksyon sa Cloud.";
+            }
+        }
+
+        function setInputValue(id, val) {
+            let input = document.getElementById(id);
+            if(!input) return;
+            let cleanVal = cleanMeterString(val);
+            input.value = cleanVal;
+            updateMeterDisplay(input);
+        }
+
+        function cleanMeterString(valStr) {
+            if (!valStr) return "00000.000";
+            let num = parseFloat(valStr);
+            if (isNaN(num)) num = 0;
+            let parts = num.toFixed(3).split('.');
+            return parts[0].padStart(5, '0') + '.' + parts[1];
+        }
+
+        window.openKeypad = function(inputElem, isRate) {
+            activeInput = inputElem;
+            isRateInput = isRate;
+            document.getElementById('keypadTitle').innerText = isRate ? "I-type ang Rate per cu.m." : "I-type ang Meter Reading (00000.000)";
+            
+            if (isRate) {
+                rawDigits = activeInput.value || "45";
+            } else {
+                let currentVal = activeInput.value || "00000.000";
+                rawDigits = currentVal.replace('.', '');
+                if (rawDigits.length < 8) rawDigits = rawDigits.padStart(8, '0');
+            }
+            
+            updateKeypadScreen();
+            document.getElementById('numberKeypad').style.display = 'block';
+        }
+
+        window.closeKeypad = function() {
+            document.getElementById('numberKeypad').style.display = 'none';
+            activeInput = null;
+        }
+
+        window.keypadPress = function(char) {
+            if(document.getElementById('adminPinModal').style.display === 'flex') {
+                if(enteredPin.length < 6) {
+                    enteredPin += char;
+                    updatePinDisplayBoxes();
+                }
+                return;
+            }
+
+            if (!activeInput) return;
+            
+            if (isRateInput) {
+                if (rawDigits === "0" && char !== '.') rawDigits = char;
+                else rawDigits += char;
+            } else {
+                if (char === '.') return; 
+                rawDigits = rawDigits.substring(1) + char;
+            }
+
+            updateKeypadScreen();
+        }
+
+        window.keypadDelete = function() {
+            if(document.getElementById('adminPinModal').style.display === 'flex') {
+                enteredPin = enteredPin.slice(0, -1);
+                updatePinDisplayBoxes();
+                return;
+            }
+
+            if (!activeInput) return;
+            
+            if (isRateInput) {
+                rawDigits = rawDigits.slice(0, -1);
+                if (rawDigits === "") rawDigits = "0";
+            } else {
+                rawDigits = "0" + rawDigits.substring(0, 7);
+            }
+
+            updateKeypadScreen();
+        }
+
+        function updateKeypadScreen() {
+            let formatted = "";
+            if (isRateInput) {
+                formatted = rawDigits;
+                activeInput.value = rawDigits;
+            } else {
+                let intPart = rawDigits.substring(0, 5);
+                let decPart = rawDigits.substring(5, 8);
+                formatted = intPart + "." + decPart;
+                activeInput.value = formatted;
+                updateMeterDisplay(activeInput);
+            }
+            document.getElementById('keypadScreenDisplay').innerText = formatted;
+        }
+
+        function updateMeterDisplay(input) {
+            let overlayId = "overlay_" + input.id;
+            let overlay = document.getElementById(overlayId);
+            if (overlay) {
+                let currentVal = input.value;
+                let dotIdx = currentVal.indexOf('.');
+                if (dotIdx !== -1) {
+                    let integerPart = currentVal.substring(0, dotIdx);
+                    let decimalPart = currentVal.substring(dotIdx);
+                    overlay.innerHTML = `<span style="color: transparent;">${integerPart}</span><span style="color: #d9534f;">${decimalPart}</span>`;
+                } else {
+                    overlay.innerHTML = "";
+                }
+            }
+        }
+
+        function parseMeter(val) {
+            if (!val) return 0;
+            let num = parseFloat(val.trim());
+            return isNaN(num) ? 0 : num;
+        }
+
+        function formatMeter(val) {
+            let num = parseFloat(val);
+            if (isNaN(num)) num = 0;
+            let parts = num.toFixed(3).split('.');
+            return parts[0].padStart(5, '0') + '.' + parts[1];
+        }
+
+        window.computeBill = async function() {
+            closeKeypad();
+            let rate = parseFloat(document.getElementById('ratePerCuMInput').value) || 45;
+            
+            let mainPrev = parseMeter(document.getElementById('mainPrev').value);
+            let mainPres = parseMeter(document.getElementById('mainPres').value);
+            let mainTotalCuM = mainPres - mainPrev;
+
+            let prevA = parseMeter(document.getElementById('prevA').value);
+            let presA = parseMeter(document.getElementById('presA').value);
+            let cuMA = presA - prevA;
+
+            let prevB = parseMeter(document.getElementById('prevB').value);
+            let presB = parseMeter(document.getElementById('presB').value);
+            let cuMB_gross = presB - prevB;
+
+            let prevC = parseMeter(document.getElementById('prevC').value);
+            let presC = parseMeter(document.getElementById('presC').value);
+            let cuMC = presC - prevC;
+
+            let netB = cuMB_gross - cuMC;
+            if (netB < 0) netB = 0;
+
+            let mainDirect = mainTotalCuM - (cuMA + netB + cuMC);
+            if (mainDirect < 0) mainDirect = 0;
+
+            let totalEdnaCuM = mainDirect + cuMC;
+
+            let payA = cuMA * rate;
+            let payB = netB * rate;
+            let payEdna = totalEdnaCuM * rate;
+
+            let formattedMainPrev = formatMeter(mainPrev);
+            let formattedMainPres = formatMeter(mainPres);
+            let formattedPrevA = formatMeter(prevA);
+            let formattedPresA = formatMeter(presA);
+            let formattedPrevB = formatMeter(prevB);
+            let formattedPresB = formatMeter(presB);
+            let formattedPrevC = formatMeter(prevC);
+            let formattedPresC = formatMeter(presC);
+
+            document.getElementById('syncStatus').innerText = "Nagse-save sa Cloud...";
+            
+            try {
+                await setDoc(doc(db, "water_system", "current_readings"), {
+                    mainPrev: formattedMainPres,
+                    prevA: formattedPresA,
+                    prevB: formattedPresB,
+                    prevC: formattedPresC,
+                    mainPres: "",
+                    presA: "",
+                    presB: "",
+                    presC: "",
+                    updatedAt: new Date().toLocaleString('fil-PH')
+                });
+                document.getElementById('syncStatus').innerText = "✔ Tagumpay na na-sync sa Cloud Database!";
+            } catch (error) {
+                console.error("Error saving to cloud:", error);
+                document.getElementById('syncStatus').innerText = "⚠ Nabigong i-save sa Cloud.";
+            }
+
+            calculatedData = {
+                rate: rate,
+                A: { name: "Sub-meter Agnes", prev: formattedPrevA, pres: formattedPresA, cum: cuMA, total: payA },
+                B: { name: "Sub-meter Ate Beth", prev: formattedPrevB, pres: formattedPresB, cum: netB, total: payB },
+                Edna: { name: "Main Meter (Sister Edna)", prev: formattedMainPrev, pres: formattedMainPres, cum: totalEdnaCuM, total: payEdna }
+            };
+
+            document.getElementById('displayRate').innerText = "₱" + rate.toFixed(2);
+            document.getElementById('totalBill').value = (mainTotalCuM * rate).toFixed(2);
+
+            let html = `
+                <tr>
+                    <td>Sub-meter Agnes</td>
+                    <td>${cuMA.toFixed(3)} cu.m.</td>
+                    <td><strong>₱${payA.toFixed(2)}</strong></td>
+                    <td><button type="button" class="btn-receipt" onclick="saveReceiptImage('A')">Save as Image</button></td>
+                </tr>
+                <tr>
+                    <td>Sub-meter Ate Beth (Net)</td>
+                    <td>${netB.toFixed(3)} cu.m.</td>
+                    <td><strong>₱${payB.toFixed(2)}</strong></td>
+                    <td><button type="button" class="btn-receipt" onclick="saveReceiptImage('B')">Save as Image</button></td>
+                </tr>
+                <tr style="background-color: #e2f0d9;">
+                    <td><strong>Main Meter (Sister Edna)</strong></td>
+                    <td><strong>${totalEdnaCuM.toFixed(3)} cu.m.</strong></td>
+                    <td><strong>₱${payEdna.toFixed(2)}</strong></td>
+                    <td><button type="button" class="btn-receipt" onclick="saveReceiptImage('Edna')">Save as Image</button></td>
+                </tr>
+            `;
+
+            document.getElementById('tableBody').innerHTML = html;
+            document.getElementById('resultBox').style.display = 'block';
+        }
+
+        window.requestResetWithPin = function() {
+            closeKeypad();
+            enteredPin = "";
+            updatePinDisplayBoxes();
+            document.getElementById('adminPinModal').style.display = 'flex';
+        }
+
+        window.closePinModal = function() {
+            document.getElementById('adminPinModal').style.display = 'none';
+            enteredPin = "";
+        }
+
+        window.clearPinInput = function() {
+            enteredPin = "";
+            updatePinDisplayBoxes();
+        }
+
+        function updatePinDisplayBoxes() {
+            for(let i=0; i<6; i++) {
+                let box = document.getElementById('pin-' + i);
+                if(i < enteredPin.length) {
+                    box.innerText = "•";
+                } else {
+                    box.innerText = "";
+                }
+            }
+        }
+
+        window.verifyAdminPin = function() {
+            if(enteredPin === CORRECT_PIN) {
+                closePinModal();
+                executeResetData();
+            } else {
+                alert("Maling PIN! Subukan muli.");
+                clearPinInput();
+            }
+        }
+
+        async function executeResetData() {
+            try {
+                await setDoc(doc(db, "water_system", "current_readings"), {
+                    mainPrev: "00000.994",
+                    prevA: "10209.800",
+                    prevB: "00000.000",
+                    prevC: "00000.000",
+                    mainPres: "",
+                    presA: "",
+                    presB: "",
+                    presC: "",
+                    updatedAt: new Date().toLocaleString('fil-PH')
+                });
+                loadCloudReadings();
+                document.getElementById('totalBill').value = "";
+                document.getElementById('resultBox').style.display = 'none';
+                alert("Na-reset na ang cloud data sa default values!");
+            } catch (error) {
+                console.error("Error resetting:", error);
+                alert("May error sa pag-reset.");
+            }
+        }
+
+        window.downloadAllSystemData = function() {
+            if (!calculatedData.A || !calculatedData.B || !calculatedData.Edna) {
+                alert("Paki-kumpyutin muna ang bill bago i-download ang data.");
+                return;
+            }
+
+            let now = new Date();
+            let reportContent = `=========================================\n`;
+            reportContent += `   MAYNILAD WATER BILL SYSTEM REPORT\n`;
+            reportContent += `=========================================\n`;
+            reportContent += `Petsa at Oras: ${now.toLocaleString('fil-PH')}\n`;
+            reportContent += `Rate per cu.m.: ₱${calculatedData.rate.toFixed(2)}\n`;
+            reportContent += `-----------------------------------------\n\n`;
+
+            reportContent += `[ 1 ] ${calculatedData.A.name}\n - Prev: ${calculatedData.A.prev} | Pres: ${calculatedData.A.pres}\n - Konsumo: ${calculatedData.A.cum.toFixed(3)} cu.m. | Babayaran: ₱${calculatedData.A.total.toFixed(2)}\n\n`;
+            reportContent += `[ 2 ] ${calculatedData.B.name}\n - Prev: ${calculatedData.B.prev} | Pres: ${calculatedData.B.pres}\n - Konsumo (Net): ${calculatedData.B.cum.toFixed(3)} cu.m. | Babayaran: ₱${calculatedData.B.total.toFixed(2)}\n\n`;
+            reportContent += `[ 3 ] ${calculatedData.Edna.name}\n - Prev: ${calculatedData.Edna.prev} | Pres: ${calculatedData.Edna.pres}\n - Konsumo (Total): ${calculatedData.Edna.cum.toFixed(3)} cu.m. | Babayaran: ₱${calculatedData.Edna.total.toFixed(2)}\n\n`;
+
+            reportContent += `-----------------------------------------\nDEVELOPER: Franklin Nesperos\n=========================================\n`;
+
+            let blob = new Blob([reportContent], { type: 'text/plain;charset=utf-8;' });
+            let link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = `Maynilad_Cloud_Report_${now.toISOString().slice(0,10)}.txt`;
+            link.click();
+        }
+
+        window.saveReceiptImage = function(key) {
+            let item = calculatedData[key];
+            if (!item) return;
+
+            let now = new Date();
+            document.getElementById('rDateTime').innerText = now.toLocaleDateString('fil-PH', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            document.getElementById('rName').innerText = item.name;
+            document.getElementById('rRate').innerText = "₱" + calculatedData.rate.toFixed(2);
+            document.getElementById('rPrev').innerText = item.prev + " cu.m.";
+            document.getElementById('rPres').innerText = item.pres + " cu.m.";
+            document.getElementById('rCuM').innerText = item.cum.toFixed(3) + " cu.m.";
+            document.getElementById('rTotal').innerText = item.total.toFixed(2);
+
+            let receiptElement = document.getElementById('receiptCardToPrint');
+            receiptElement.style.left = '0';
+            receiptElement.style.top = '0';
+
+            html2canvas(receiptElement, { scale: 2 }).then(canvas => {
+                receiptElement.style.left = '-9999px';
+                let link = document.createElement('a');
+                link.download = `Resibo_${item.name.replace(/\s+/g, '_')}.png`;
+                link.href = canvas.toDataURL('image/png');
+                link.click();
+            });
+        }
+    </script>
 
     <style>
         :root {
@@ -123,7 +510,6 @@
             overflow: hidden;
         }
 
-        /* Keypad Popup */
         .keypad-popup {
             position: fixed;
             bottom: 0;
@@ -205,7 +591,6 @@
             color: #0275d8;
         }
 
-        /* Admin PIN Modal (Batay sa larawan) */
         .pin-modal {
             position: fixed;
             inset: 0;
@@ -425,17 +810,17 @@
         </div>
     </div>
 
-    <div class="section-title">2. Main Meter Reading (Ate Edna) <span style="font-size:0.8em; color:#666; font-weight:normal;">(00000<span style="color:#d9534f">.000</span>)</span></div>
+    <div class="section-title">2. Main Meter Reading (Sister Edna) <span style="font-size:0.8em; color:#666; font-weight:normal;">(00000<span style="color:#d9534f">.000</span>)</span></div>
     <div class="grid-2">
         <div class="form-group">
-            <label>Dati (Previous):</label>
+            <label>Previous:</label>
             <div class="meter-input-wrapper">
                 <input type="text" id="mainPrev" placeholder="00000.000" onclick="openKeypad(this, false)" onfocus="openKeypad(this, false)" readonly>
                 <div class="meter-overlay" id="overlay_mainPrev"></div>
             </div>
         </div>
         <div class="form-group">
-            <label>Kasalukuyan (Present):</label>
+            <label>Present:</label>
             <div class="meter-input-wrapper">
                 <input type="text" id="mainPres" placeholder="00000.000" onclick="openKeypad(this, false)" onfocus="openKeypad(this, false)" readonly>
                 <div class="meter-overlay" id="overlay_mainPres"></div>
@@ -448,14 +833,14 @@
         <div class="section-title" style="margin-top:0;">Sub-meter A (Agnes)</div>
         <div class="grid-2">
             <div class="form-group">
-                <label>Dati (Previous):</label>
+                <label>Previous:</label>
                 <div class="meter-input-wrapper">
                     <input type="text" id="prevA" placeholder="00000.000" onclick="openKeypad(this, false)" onfocus="openKeypad(this, false)" readonly>
                     <div class="meter-overlay" id="overlay_prevA"></div>
                 </div>
             </div>
             <div class="form-group">
-                <label>Kasalukuyan (Present):</label>
+                <label>Present:</label>
                 <div class="meter-input-wrapper">
                     <input type="text" id="presA" placeholder="00000.000" onclick="openKeypad(this, false)" onfocus="openKeypad(this, false)" readonly>
                     <div class="meter-overlay" id="overlay_presA"></div>
@@ -466,17 +851,17 @@
 
     <!-- SUBMETER B -->
     <div class="submeter-card">
-        <div class="section-title" style="margin-top:0;">Sub-meter B (Sub-meter Ate Beth)</div>
+        <div class="section-title" style="margin-top:0;">Sub-meter B (Sub-meter Sister Beth)</div>
         <div class="grid-2">
             <div class="form-group">
-                <label>Dati (Previous):</label>
+                <label>Previous:</label>
                 <div class="meter-input-wrapper">
                     <input type="text" id="prevB" placeholder="00000.000" onclick="openKeypad(this, false)" onfocus="openKeypad(this, false)" readonly>
                     <div class="meter-overlay" id="overlay_prevB"></div>
                 </div>
             </div>
             <div class="form-group">
-                <label>Kasalukuyan (Present):</label>
+                <label>Present:</label>
                 <div class="meter-input-wrapper">
                     <input type="text" id="presB" placeholder="00000.000" onclick="openKeypad(this, false)" onfocus="openKeypad(this, false)" readonly>
                     <div class="meter-overlay" id="overlay_presB"></div>
@@ -487,17 +872,17 @@
 
     <!-- SUBMETER C -->
     <div class="submeter-card">
-        <div class="section-title" style="margin-top:0;">Sub-meter C (Sub-meter Ate Edna)</div>
+        <div class="section-title" style="margin-top:0;">Sub-meter C (Sub-meter Sister Edna)</div>
         <div class="grid-2">
             <div class="form-group">
-                <label>Dati (Previous):</label>
+                <label>Previous:</label>
                 <div class="meter-input-wrapper">
                     <input type="text" id="prevC" placeholder="00000.000" onclick="openKeypad(this, false)" onfocus="openKeypad(this, false)" readonly>
                     <div class="meter-overlay" id="overlay_prevC"></div>
                 </div>
             </div>
             <div class="form-group">
-                <label>Kasalukuyan (Present):</label>
+                <label>Present:</label>
                 <div class="meter-input-wrapper">
                     <input type="text" id="presC" placeholder="00000.000" onclick="openKeypad(this, false)" onfocus="openKeypad(this, false)" readonly>
                     <div class="meter-overlay" id="overlay_presC"></div>
@@ -507,7 +892,7 @@
     </div>
 
     <div class="btn-group">
-        <button type="button" class="btn-compute" onclick="computeBill()">KUMPYUTIN AT I-SYNC SA CLOUD</button>
+        <button type="button" class="btn-compute" onclick="computeBill()">COMPUTE AND SYNC</button>
         <button type="button" class="btn-reset" onclick="requestResetWithPin()">RESET READINGS</button>
     </div>
 
@@ -559,7 +944,7 @@
     </div>
 </div>
 
-<!-- Admin PIN Modal (Interface ayon sa iyong larawan) -->
+<!-- Admin PIN Modal -->
 <div class="pin-modal" id="adminPinModal">
     <div class="pin-card">
         <div style="text-align: right;"><button onclick="closePinModal()" style="border:none; background:none; font-size:16px; font-weight:bold; cursor:pointer;">✕</button></div>
@@ -596,414 +981,6 @@
     <hr style="border-top: 1px dashed #000; margin: 10px 0;">
     <div style="font-size: 1.2em; font-weight: bold; text-align: center; background: #f0f0f0; padding: 8px;">KABUUAN: ₱<span id="rTotal"></span></div>
 </div>
-
-<script>
-    // ----- OPISYAL NA FIREBASE CONFIG MULA SA MAYNILAD-CALCULATOR PROJECT -----
-    const firebaseConfig = {
-        apiKey: "AIzaSyD8kZ7TJ8_8h2kZ82HaXU4LHTpfzMzy23g",
-        authDomain: "maynilad-calculator.firebaseapp.com",
-        projectId: "maynilad-calculator",
-        storageBucket: "maynilad-calculator.firebasestorage.app",
-        messagingSenderId: "236444881363",
-        appId: "1:236444881363:web:00d1ca915629a2fc7cc826"
-    };
-
-    firebase.initializeApp(firebaseConfig);
-    const db = firebase.firestore();
-
-    let calculatedData = {};
-    let activeInput = null;
-    let isRateInput = false;
-    let rawDigits = "00000000"; // 5 integer + 3 decimal digits
-    
-    // PIN handling variables
-    let enteredPin = "";
-    const CORRECT_PIN = "082707";
-
-    window.onload = function() {
-        loadCloudReadings();
-    };
-
-    function loadCloudReadings() {
-        db.collection("water_system").doc("current_readings").get().then((doc) => {
-            if (doc.exists) {
-                let data = doc.data();
-                setInputValue('mainPrev', data.mainPrev || "00000.994");
-                setInputValue('prevA', data.prevA || "10209.800");
-                setInputValue('prevB', data.prevB || "00000.000");
-                setInputValue('prevC', data.prevC || "00000.000");
-                
-                ['mainPres', 'presA', 'presB', 'presC'].forEach(id => setInputValue(id, "00000.000"));
-
-                document.getElementById('syncStatus').innerText = "✔ Nakakonekta sa Cloud (Real-time Sync Active)";
-            } else {
-                setInputValue('mainPrev', "00000.994");
-                setInputValue('prevA', "10209.800");
-                setInputValue('prevB", "00000.000");
-                setInputValue('prevC', "00000.000");
-                document.getElementById('syncStatus').innerText = "✔ Handa na sa Cloud Database";
-            }
-        }).catch((error) => {
-            console.error("Error loading cloud data:", error);
-            document.getElementById('syncStatus').innerText = "⚠ May problema sa koneksyon sa Cloud.";
-        });
-    }
-
-    function setInputValue(id, val) {
-        let input = document.getElementById(id);
-        if(!input) return;
-        let cleanVal = cleanMeterString(val);
-        input.value = cleanVal;
-        updateMeterDisplay(input);
-    }
-
-    function cleanMeterString(valStr) {
-        if (!valStr) return "00000.000";
-        let num = parseFloat(valStr);
-        if (isNaN(num)) num = 0;
-        let parts = num.toFixed(3).split('.');
-        return parts[0].padStart(5, '0') + '.' + parts[1];
-    }
-
-    function openKeypad(inputElem, isRate) {
-        activeInput = inputElem;
-        isRateInput = isRate;
-        document.getElementById('keypadTitle').innerText = isRate ? "I-type ang Rate per cu.m." : "I-type ang Meter Reading (00000.000)";
-        
-        if (isRate) {
-            rawDigits = activeInput.value || "45";
-        } else {
-            let currentVal = activeInput.value || "00000.000";
-            rawDigits = currentVal.replace('.', '');
-            if (rawDigits.length < 8) rawDigits = rawDigits.padStart(8, '0');
-        }
-        
-        updateKeypadScreen();
-        document.getElementById('numberKeypad').style.display = 'block';
-    }
-
-    function closeKeypad() {
-        document.getElementById('numberKeypad').style.display = 'none';
-        activeInput = null;
-    }
-
-    function keypadPress(char) {
-        if (!activeInput) return;
-        
-        if (isRateInput) {
-            if (rawDigits === "0" && char !== '.') rawDigits = char;
-            else rawDigits += char;
-        } else {
-            if (char === '.') return; // Fixed decimal na sa odometer format
-            // Shift left ang mga digits (parang mekanikal na metro)
-            rawDigits = rawDigits.substring(1) + char;
-        }
-
-        updateKeypadScreen();
-    }
-
-    function keypadDelete() {
-        if (!activeInput) return;
-        
-        if (isRateInput) {
-            rawDigits = rawDigits.slice(0, -1);
-            if (rawDigits === "") rawDigits = "0";
-        } else {
-            // I-reset pabalik sa zero ang dulo kapag nag-delete
-            rawDigits = "0" + rawDigits.substring(0, 7);
-        }
-
-        updateKeypadScreen();
-    }
-
-    function updateKeypadScreen() {
-        let formatted = "";
-        if (isRateInput) {
-            formatted = rawDigits;
-            activeInput.value = rawDigits;
-        } else {
-            let intPart = rawDigits.substring(0, 5);
-            let decPart = rawDigits.substring(5, 8);
-            formatted = intPart + "." + decPart;
-            activeInput.value = formatted;
-            updateMeterDisplay(activeInput);
-        }
-        document.getElementById('keypadScreenDisplay').innerText = formatted;
-    }
-
-    function updateMeterDisplay(input) {
-        let overlayId = "overlay_" + input.id;
-        let overlay = document.getElementById(overlayId);
-        if (overlay) {
-            let currentVal = input.value;
-            let dotIdx = currentVal.indexOf('.');
-            if (dotIdx !== -1) {
-                let integerPart = currentVal.substring(0, dotIdx);
-                let decimalPart = currentVal.substring(dotIdx);
-                overlay.innerHTML = `<span style="color: transparent;">${integerPart}</span><span style="color: #d9534f;">${decimalPart}</span>`;
-            } else {
-                overlay.innerHTML = "";
-            }
-        }
-    }
-
-    function parseMeter(val) {
-        if (!val) return 0;
-        let num = parseFloat(val.trim());
-        return isNaN(num) ? 0 : num;
-    }
-
-    function formatMeter(val) {
-        let num = parseFloat(val);
-        if (isNaN(num)) num = 0;
-        let parts = num.toFixed(3).split('.');
-        return parts[0].padStart(5, '0') + '.' + parts[1];
-    }
-
-    function computeBill() {
-        closeKeypad();
-        let rate = parseFloat(document.getElementById('ratePerCuMInput').value) || 45;
-        
-        let mainPrev = parseMeter(document.getElementById('mainPrev').value);
-        let mainPres = parseMeter(document.getElementById('mainPres').value);
-        let mainTotalCuM = mainPres - mainPrev;
-
-        let prevA = parseMeter(document.getElementById('prevA').value);
-        let presA = parseMeter(document.getElementById('presA').value);
-        let cuMA = presA - prevA;
-
-        let prevB = parseMeter(document.getElementById('prevB').value);
-        let presB = parseMeter(document.getElementById('presB').value);
-        let cuMB_gross = presB - prevB;
-
-        let prevC = parseMeter(document.getElementById('prevC').value);
-        let presC = parseMeter(document.getElementById('presC').value);
-        let cuMC = presC - prevC;
-
-        let netB = cuMB_gross - cuMC;
-        if (netB < 0) netB = 0;
-
-        let mainDirect = mainTotalCuM - (cuMA + netB + cuMC);
-        if (mainDirect < 0) mainDirect = 0;
-
-        let totalEdnaCuM = mainDirect + cuMC;
-
-        let payA = cuMA * rate;
-        let payB = netB * rate;
-        let payEdna = totalEdnaCuM * rate;
-
-        let formattedMainPrev = formatMeter(mainPrev);
-        let formattedMainPres = formatMeter(mainPres);
-        let formattedPrevA = formatMeter(prevA);
-        let formattedPresA = formatMeter(presA);
-        let formattedPrevB = formatMeter(prevB);
-        let formattedPresB = formatMeter(presB);
-        let formattedPrevC = formatMeter(prevC);
-        let formattedPresC = formatMeter(presC);
-
-        document.getElementById('syncStatus').innerText = "Nagse-save sa Cloud...";
-        
-        db.collection("water_system").doc("current_readings").set({
-            mainPrev: formattedMainPres,
-            prevA: formattedPresA,
-            prevB: formattedPresB,
-            prevC: formattedPresC,
-            mainPres: "",
-            presA: "",
-            presB: "",
-            presC: "",
-            updatedAt: new Date().toLocaleString('fil-PH')
-        }).then(() => {
-            document.getElementById('syncStatus').innerText = "✔ Tagumpay na na-sync sa Cloud Database!";
-        }).catch((error) => {
-            console.error("Error saving to cloud:", error);
-            document.getElementById('syncStatus').innerText = "⚠ Nabigong i-save sa Cloud.";
-        });
-
-        calculatedData = {
-            rate: rate,
-            A: { name: "Sub-meter Agnes", prev: formattedPrevA, pres: formattedPresA, cum: cuMA, total: payA },
-            B: { name: "Sub-meter Ate Beth", prev: formattedPrevB, pres: formattedPresB, cum: netB, total: payB },
-            Edna: { name: "Main Meter (Ate Edna)", prev: formattedMainPrev, pres: formattedMainPres, cum: totalEdnaCuM, total: payEdna }
-        };
-
-        document.getElementById('displayRate').innerText = "₱" + rate.toFixed(2);
-        document.getElementById('totalBill').value = (mainTotalCuM * rate).toFixed(2);
-
-        let html = `
-            <tr>
-                <td>Sub-meter Agnes</td>
-                <td>${cuMA.toFixed(3)} cu.m.</td>
-                <td><strong>₱${payA.toFixed(2)}</strong></td>
-                <td><button type="button" class="btn-receipt" onclick="saveReceiptImage('A')">Save as Image</button></td>
-            </tr>
-            <tr>
-                <td>Sub-meter Ate Beth (Net)</td>
-                <td>${netB.toFixed(3)} cu.m.</td>
-                <td><strong>₱${payB.toFixed(2)}</strong></td>
-                <td><button type="button" class="btn-receipt" onclick="saveReceiptImage('B')">Save as Image</button></td>
-            </tr>
-            <tr style="background-color: #e2f0d9;">
-                <td><strong>Main Meter (Ate Edna)</strong></td>
-                <td><strong>${totalEdnaCuM.toFixed(3)} cu.m.</strong></td>
-                <td><strong>₱${payEdna.toFixed(2)}</strong></td>
-                <td><button type="button" class="btn-receipt" onclick="saveReceiptImage('Edna')">Save as Image</button></td>
-            </tr>
-        `;
-
-        document.getElementById('tableBody').innerHTML = html;
-        document.getElementById('resultBox').style.display = 'block';
-    }
-
-    // --- ADMIN PIN FUNCTIONS ---
-    function requestResetWithPin() {
-        closeKeypad();
-        enteredPin = "";
-        updatePinDisplayBoxes();
-        document.getElementById('adminPinModal').style.display = 'flex';
-    }
-
-    function closePinModal() {
-        document.getElementById('adminPinModal').style.display = 'none';
-        enteredPin = "";
-    }
-
-    function clearPinInput() {
-        enteredPin = "";
-        updatePinDisplayBoxes();
-    }
-
-    // Pagpindot sa keypad para sa PIN (gumagamit din ng parehong keypad o pwede sa pamamagitan ng paggawa ng PIN entry)
-    // Para masigurong gumagana sa pamamagitan ng numeric keypad kapag lumabas ang pin modal:
-    document.addEventListener('keydown', function(e) {
-        if(document.getElementById('adminPinModal').style.display === 'flex') {
-            if(!isNaN(e.key) && enteredPin.length < 6) {
-                enteredPin += e.key;
-                updatePinDisplayBoxes();
-            } else if(e.key === 'Backspace') {
-                enteredPin = enteredPin.slice(0, -1);
-                updatePinDisplayBoxes();
-            }
-        }
-    });
-
-    // Dagdag na suporta para ma-type sa pamamagitan ng pagpindot sa numpad buttons kapag bukas ang PIN modal
-    // Binago natin ang keypadPress para sumuporta rin sa PIN kung bukas ang PIN modal:
-    let oldKeypadPress = keypadPress;
-    window.keypadPress = function(char) {
-        if(document.getElementById('adminPinModal').style.display === 'flex') {
-            if(enteredPin.length < 6) {
-                enteredPin += char;
-                updatePinDisplayBoxes();
-            }
-            return;
-        }
-        oldKeypadPress(char);
-    };
-
-    let oldKeypadDelete = keypadDelete;
-    window.keypadDelete = function() {
-        if(document.getElementById('adminPinModal').style.display === 'flex') {
-            enteredPin = enteredPin.slice(0, -1);
-            updatePinDisplayBoxes();
-            return;
-        }
-        oldKeypadDelete();
-    };
-
-    function updatePinDisplayBoxes() {
-        for(let i=0; i<6; i++) {
-            let box = document.getElementById('pin-' + i);
-            if(i < enteredPin.length) {
-                box.innerText = "•"; // O maaari ding ilagay ang mismong numero kung gusto mo: enteredPin[i]
-            } else {
-                box.innerText = "";
-            }
-        }
-    }
-
-    function verifyAdminPin() {
-        if(enteredPin === CORRECT_PIN) {
-            closePinModal();
-            executeResetData();
-        } else {
-            alert("Maling PIN! Subukan muli.");
-            clearPinInput();
-        }
-    }
-
-    function executeResetData() {
-        db.collection("water_system").doc("current_readings").set({
-            mainPrev: "00000.994",
-            prevA: "10209.800",
-            prevB: "00000.000",
-            prevC: "00000.000",
-            mainPres: "",
-            presA: "",
-            presB: "",
-            presC: "",
-            updatedAt: new Date().toLocaleString('fil-PH')
-        }).then(() => {
-            loadCloudReadings();
-            document.getElementById('totalBill').value = "";
-            document.getElementById('resultBox').style.display = 'none';
-            alert("Na-reset na ang cloud data sa default values!");
-        });
-    }
-
-    function downloadAllSystemData() {
-        if (!calculatedData.A || !calculatedData.B || !calculatedData.Edna) {
-            alert("Paki-kumpyutin muna ang bill bago i-download ang data.");
-            return;
-        }
-
-        let now = new Date();
-        let reportContent = `=========================================\n`;
-        reportContent += `   MAYNILAD WATER BILL SYSTEM REPORT\n`;
-        reportContent += `=========================================\n`;
-        reportContent += `Petsa at Oras: ${now.toLocaleString('fil-PH')}\n`;
-        reportContent += `Rate per cu.m.: ₱${calculatedData.rate.toFixed(2)}\n`;
-        reportContent += `-----------------------------------------\n\n`;
-
-        reportContent += `[ 1 ] ${calculatedData.A.name}\n - Prev: ${calculatedData.A.prev} | Pres: ${calculatedData.A.pres}\n - Konsumo: ${calculatedData.A.cum.toFixed(3)} cu.m. | Babayaran: ₱${calculatedData.A.total.toFixed(2)}\n\n`;
-        reportContent += `[ 2 ] ${calculatedData.B.name}\n - Prev: ${calculatedData.B.prev} | Pres: ${calculatedData.B.pres}\n - Konsumo (Net): ${calculatedData.B.cum.toFixed(3)} cu.m. | Babayaran: ₱${calculatedData.B.total.toFixed(2)}\n\n`;
-        reportContent += `[ 3 ] ${calculatedData.Edna.name}\n - Prev: ${calculatedData.Edna.prev} | Pres: ${calculatedData.Edna.pres}\n - Konsumo (Total): ${calculatedData.Edna.cum.toFixed(3)} cu.m. | Babayaran: ₱${calculatedData.Edna.total.toFixed(2)}\n\n`;
-
-        reportContent += `-----------------------------------------\nDEVELOPER: Franklin Nesperos\n=========================================\n`;
-
-        let blob = new Blob([reportContent], { type: 'text/plain;charset=utf-8;' });
-        let link = document.createElement('a');
-        link.href = URL.createObjectURL(blob);
-        link.download = `Maynilad_Cloud_Report_${now.toISOString().slice(0,10)}.txt`;
-        link.click();
-    }
-
-    function saveReceiptImage(key) {
-        let item = calculatedData[key];
-        if (!item) return;
-
-        let now = new Date();
-        document.getElementById('rDateTime').innerText = now.toLocaleDateString('fil-PH', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' });
-        document.getElementById('rName').innerText = item.name;
-        document.getElementById('rRate').innerText = "₱" + calculatedData.rate.toFixed(2);
-        document.getElementById('rPrev').innerText = item.prev + " cu.m.";
-        document.getElementById('rPres').innerText = item.pres + " cu.m.";
-        document.getElementById('rCuM').innerText = item.cum.toFixed(3) + " cu.m.";
-        document.getElementById('rTotal').innerText = item.total.toFixed(2);
-
-        let receiptElement = document.getElementById('receiptCardToPrint');
-        receiptElement.style.left = '0';
-        receiptElement.style.top = '0';
-
-        html2canvas(receiptElement, { scale: 2 }).then(canvas => {
-            receiptElement.style.left = '-9999px';
-            let link = document.createElement('a');
-            link.download = `Resibo_${item.name.replace(/\s+/g, '_')}.png`;
-            link.href = canvas.toDataURL('image/png');
-            link.click();
-        });
-    }
-</script>
 
 </body>
 </html>
