@@ -69,10 +69,8 @@
             if(!input) return;
             let cleanVal = cleanMeterString(val);
             input.value = cleanVal;
-            updateMeterDisplay(input);
         }
 
-        // Tinitiyak na eksaktong 5 integer at 3 decimals lang ang ilalabas nang walang dobleng patong
         function cleanMeterString(valStr) {
             if (!valStr) return "00000.000";
             let cleanStr = String(valStr).replace(/[^0-9.]/g, '');
@@ -141,25 +139,8 @@
                 let decPart = rawDigits.substring(5, 8);
                 formatted = intPart + "." + decPart;
                 activeInput.value = formatted;
-                updateMeterDisplay(activeInput);
             }
             document.getElementById('keypadScreenDisplay').innerText = formatted;
-        }
-
-        function updateMeterDisplay(input) {
-            let overlayId = "overlay_" + input.id;
-            let overlay = document.getElementById(overlayId);
-            if (overlay) {
-                let currentVal = input.value;
-                let dotIdx = currentVal.indexOf('.');
-                if (dotIdx !== -1) {
-                    let integerPart = currentVal.substring(0, dotIdx);
-                    let decimalPart = currentVal.substring(dotIdx);
-                    overlay.innerHTML = `<span style="color: transparent;">${integerPart}</span><span style="color: #d9534f;">${decimalPart}</span>`;
-                } else {
-                    overlay.innerHTML = "";
-                }
-            }
         }
 
         function parseMeter(val) {
@@ -240,7 +221,7 @@
                 rate: rate,
                 A: { name: "Sub-meter Agnes", prev: formattedPrevA, pres: formattedPresA, cum: cuMA, total: payA },
                 B: { name: "Sub-meter Ate Beth", prev: formattedPrevB, pres: formattedPresB, cum: netB, total: payB },
-                Edna: { name: "Main Meter (Sister Edna)", prev: formattedMainPrev, pres: formattedMainPres, cum: totalEdnaCuM, total: payEdna }
+                Edna: { name: "Main Meter (Sister Edna)", prev: formattedMainPrev, pres: formattedPresPres || formattedMainPres, cum: totalEdnaCuM, total: payEdna }
             };
 
             document.getElementById('displayRate').innerText = "₱" + rate.toFixed(2);
@@ -494,21 +475,6 @@
         .meter-input-wrapper input:focus {
             outline: none;
             border-color: var(--primary);
-        }
-
-        .meter-overlay {
-            position: absolute;
-            left: 10px;
-            right: 10px;
-            top: 50%;
-            transform: translateY(-50%);
-            font-size: 16px;
-            font-family: monospace;
-            font-weight: bold;
-            letter-spacing: 1px;
-            pointer-events: none;
-            white-space: pre;
-            overflow: hidden;
         }
 
         .keypad-popup {
@@ -840,14 +806,12 @@
             <label>Previous:</label>
             <div class="meter-input-wrapper">
                 <input type="text" id="mainPrev" placeholder="00000.000" onclick="openKeypad(this, false)" onfocus="openKeypad(this, false)" readonly>
-                <div class="meter-overlay" id="overlay_mainPrev"></div>
             </div>
         </div>
         <div class="form-group">
             <label>Present:</label>
             <div class="meter-input-wrapper">
                 <input type="text" id="mainPres" placeholder="00000.000" onclick="openKeypad(this, false)" onfocus="openKeypad(this, false)" readonly>
-                <div class="meter-overlay" id="overlay_mainPres"></div>
             </div>
         </div>
     </div>
@@ -860,14 +824,12 @@
                 <label>Previous:</label>
                 <div class="meter-input-wrapper">
                     <input type="text" id="prevA" placeholder="00000.000" onclick="openKeypad(this, false)" onfocus="openKeypad(this, false)" readonly>
-                    <div class="meter-overlay" id="overlay_prevA"></div>
                 </div>
             </div>
             <div class="form-group">
                 <label>Present:</label>
                 <div class="meter-input-wrapper">
                     <input type="text" id="presA" placeholder="00000.000" onclick="openKeypad(this, false)" onfocus="openKeypad(this, false)" readonly>
-                    <div class="meter-overlay" id="overlay_presA"></div>
                 </div>
             </div>
         </div>
@@ -881,14 +843,12 @@
                 <label>Previous:</label>
                 <div class="meter-input-wrapper">
                     <input type="text" id="prevB" placeholder="00000.000" onclick="openKeypad(this, false)" onfocus="openKeypad(this, false)" readonly>
-                    <div class="meter-overlay" id="overlay_prevB"></div>
                 </div>
             </div>
             <div class="form-group">
                 <label>Present:</label>
                 <div class="meter-input-wrapper">
                     <input type="text" id="presB" placeholder="00000.000" onclick="openKeypad(this, false)" onfocus="openKeypad(this, false)" readonly>
-                    <div class="meter-overlay" id="overlay_presB"></div>
                 </div>
             </div>
         </div>
@@ -902,14 +862,12 @@
                 <label>Previous:</label>
                 <div class="meter-input-wrapper">
                     <input type="text" id="prevC" placeholder="00000.000" onclick="openKeypad(this, false)" onfocus="openKeypad(this, false)" readonly>
-                    <div class="meter-overlay" id="overlay_prevC"></div>
                 </div>
             </div>
             <div class="form-group">
                 <label>Present:</label>
                 <div class="meter-input-wrapper">
                     <input type="text" id="presC" placeholder="00000.000" onclick="openKeypad(this, false)" onfocus="openKeypad(this, false)" readonly>
-                    <div class="meter-overlay" id="overlay_presC"></div>
                 </div>
             </div>
         </div>
