@@ -123,7 +123,7 @@
             overflow: hidden;
         }
 
-        /* Keypad Popup Improvements */
+        /* Keypad Popup */
         .keypad-popup {
             position: fixed;
             bottom: 0;
@@ -158,13 +158,13 @@
             border: 2px solid #ced4da;
             border-radius: 8px;
             padding: 10px;
-            font-size: 22px;
+            font-size: 24px;
             font-family: monospace;
             font-weight: bold;
             text-align: right;
             margin-bottom: 12px;
-            letter-spacing: 1px;
-            min-height: 35px;
+            letter-spacing: 2px;
+            min-height: 40px;
             color: #000;
         }
 
@@ -205,6 +205,92 @@
             color: #0275d8;
         }
 
+        /* Admin PIN Modal (Batay sa larawan) */
+        .pin-modal {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.5);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+            padding: 20px;
+        }
+
+        .pin-card {
+            background: #ffffff;
+            width: 100%;
+            max-width: 420px;
+            border-radius: 16px;
+            padding: 24px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+            box-sizing: border-box;
+        }
+
+        .pin-header-title {
+            text-align: center;
+            font-weight: bold;
+            font-size: 1.1em;
+            color: #333;
+            margin-bottom: 5px;
+        }
+
+        .pin-subtext {
+            text-align: center;
+            font-size: 0.85em;
+            color: #666;
+            margin-bottom: 20px;
+        }
+
+        .pin-boxes {
+            display: flex;
+            justify-content: space-between;
+            gap: 8px;
+            margin-bottom: 15px;
+        }
+
+        .pin-box {
+            width: 45px;
+            height: 50px;
+            border: 2px solid #ced4da;
+            border-radius: 8px;
+            font-size: 24px;
+            font-weight: bold;
+            text-align: center;
+            line-height: 46px;
+            background: #f8f9fa;
+            color: #333;
+        }
+
+        .pin-actions-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.85em;
+            color: #555;
+            margin-bottom: 20px;
+        }
+
+        .pin-clear-btn {
+            background: none;
+            border: none;
+            color: #000;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .btn-verify-pin {
+            width: 100%;
+            background-color: var(--primary);
+            color: white;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
         .submeter-card {
             background: #fafafa;
             border: 1px solid #eaeaea;
@@ -232,10 +318,6 @@
             font-weight: bold;
         }
 
-        .btn-compute:hover {
-            background-color: var(--primary-hover);
-        }
-
         .btn-reset {
             width: 100%;
             background-color: var(--danger);
@@ -246,10 +328,6 @@
             font-size: 14px;
             cursor: pointer;
             font-weight: bold;
-        }
-
-        .btn-reset:hover {
-            background-color: var(--danger-hover);
         }
 
         .btn-download-all {
@@ -263,10 +341,6 @@
             cursor: pointer;
             font-weight: bold;
             margin-top: 15px;
-        }
-
-        .btn-download-all:hover {
-            background-color: var(--success-hover);
         }
 
         .result-box {
@@ -311,10 +385,6 @@
             margin-right: 5px;
         }
 
-        .btn-receipt:hover {
-            background: #218838;
-        }
-
         .footer {
             text-align: center;
             margin-top: 30px;
@@ -334,36 +404,6 @@
             position: absolute;
             left: -9999px;
             top: 0;
-        }
-        .receipt-header {
-            text-align: center;
-            font-weight: bold;
-            font-size: 1.1em;
-            margin-bottom: 10px;
-        }
-        .receipt-divider {
-            border-top: 1px dashed #000;
-            margin: 10px 0;
-        }
-        .receipt-row {
-            display: flex;
-            justify-content: space-between;
-            margin: 6px 0;
-            font-size: 0.95em;
-        }
-        .receipt-total {
-            font-size: 1.2em;
-            font-weight: bold;
-            text-align: center;
-            margin-top: 15px;
-            background: #f0f0f0;
-            padding: 8px;
-        }
-        .receipt-footer {
-            text-align: center;
-            font-size: 0.8em;
-            margin-top: 15px;
-            color: #555;
         }
     </style>
 </head>
@@ -468,7 +508,7 @@
 
     <div class="btn-group">
         <button type="button" class="btn-compute" onclick="computeBill()">KUMPYUTIN AT I-SYNC SA CLOUD</button>
-        <button type="button" class="btn-reset" onclick="resetAllData()">RESET READINGS</button>
+        <button type="button" class="btn-reset" onclick="requestResetWithPin()">RESET READINGS</button>
     </div>
 
     <div class="result-box" id="resultBox">
@@ -496,14 +536,13 @@
     </div>
 </div>
 
-<!-- Naka-box at Naka-pop up na Numeric Keypad na may Screen Display -->
+<!-- Odometer Style Keypad Popup -->
 <div class="keypad-popup" id="numberKeypad">
     <div class="keypad-header">
         <span id="keypadTitle">Ilagay ang Numero</span>
         <button class="keypad-close" onclick="closeKeypad()">ISARA</button>
     </div>
-    <!-- Dito na lalabas ang mismong tina-type mong numero sa pop-up -->
-    <div class="keypad-screen" id="keypadScreenDisplay">0</div>
+    <div class="keypad-screen" id="keypadScreenDisplay">00000.000</div>
     <div class="keypad-grid">
         <button class="keypad-btn" onclick="keypadPress('1')">1</button>
         <button class="keypad-btn" onclick="keypadPress('2')">2</button>
@@ -520,21 +559,42 @@
     </div>
 </div>
 
-<div id="receiptCardToPrint" class="receipt-card">
-    <div class="receipt-header">MAYNILAD WATER BILL RECEIPT</div>
-    <div style="text-align: center; font-size: 0.85em;" id="rDateTime"></div>
-    <div class="receipt-divider"></div>
-    <div class="receipt-row"><span>Pangalan:</span> <strong id="rName"></strong></div>
-    <div class="receipt-row"><span>Rate / cu.m.:</span> <span id="rRate"></span></div>
-    <div class="receipt-row"><span>Previous Reading:</span> <span id="rPrev"></span></div>
-    <div class="receipt-row"><span>Present Reading:</span> <span id="rPres"></span></div>
-    <div class="receipt-row"><span>Consumption:</span> <strong id="rCuM"></strong></div>
-    <div class="receipt-divider"></div>
-    <div class="receipt-total">KABUUAN: ₱<span id="rTotal"></span></div>
-    <div class="receipt-footer">
-        Salamat sa pagbabayad!<br>
-        <strong>Developer: Franklin Nesperos</strong>
+<!-- Admin PIN Modal (Interface ayon sa iyong larawan) -->
+<div class="pin-modal" id="adminPinModal">
+    <div class="pin-card">
+        <div style="text-align: right;"><button onclick="closePinModal()" style="border:none; background:none; font-size:16px; font-weight:bold; cursor:pointer;">✕</button></div>
+        <div class="pin-header-title">ILAGAY ANG ADMIN PIN</div>
+        <div class="pin-subtext">Ilagay ang iyong Admin PIN para i-reset ang mga data</div>
+        
+        <div class="pin-boxes">
+            <div class="pin-box" id="pin-0"></div>
+            <div class="pin-box" id="pin-1"></div>
+            <div class="pin-box" id="pin-2"></div>
+            <div class="pin-box" id="pin-3"></div>
+            <div class="pin-box" id="pin-4"></div>
+            <div class="pin-box" id="pin-5"></div>
+        </div>
+
+        <div class="pin-actions-row">
+            <span>Kailangan ng PIN para sa kaligtasan ng transaksyon</span>
+            <button class="pin-clear-btn" onclick="clearPinInput()">Clear</button>
+        </div>
+
+        <button class="btn-verify-pin" onclick="verifyAdminPin()">I-verify</button>
     </div>
+</div>
+
+<div id="receiptCardToPrint" class="receipt-card">
+    <div style="text-align: center; font-weight: bold; font-size: 1.1em; margin-bottom: 10px;">MAYNILAD WATER BILL RECEIPT</div>
+    <div style="text-align: center; font-size: 0.85em;" id="rDateTime"></div>
+    <hr style="border-top: 1px dashed #000; margin: 10px 0;">
+    <div>Pangalan: <strong id="rName"></strong></div>
+    <div>Rate / cu.m.: <span id="rRate"></span></div>
+    <div>Previous Reading: <span id="rPrev"></span></div>
+    <div>Present Reading: <span id="rPres"></span></div>
+    <div>Consumption: <strong id="rCuM"></strong></div>
+    <hr style="border-top: 1px dashed #000; margin: 10px 0;">
+    <div style="font-size: 1.2em; font-weight: bold; text-align: center; background: #f0f0f0; padding: 8px;">KABUUAN: ₱<span id="rTotal"></span></div>
 </div>
 
 <script>
@@ -554,6 +614,11 @@
     let calculatedData = {};
     let activeInput = null;
     let isRateInput = false;
+    let rawDigits = "00000000"; // 5 integer + 3 decimal digits
+    
+    // PIN handling variables
+    let enteredPin = "";
+    const CORRECT_PIN = "082707";
 
     window.onload = function() {
         loadCloudReadings();
@@ -574,7 +639,7 @@
             } else {
                 setInputValue('mainPrev', "00000.994");
                 setInputValue('prevA', "10209.800");
-                setInputValue('prevB', "00000.000");
+                setInputValue('prevB", "00000.000");
                 setInputValue('prevC', "00000.000");
                 document.getElementById('syncStatus').innerText = "✔ Handa na sa Cloud Database";
             }
@@ -603,12 +668,17 @@
     function openKeypad(inputElem, isRate) {
         activeInput = inputElem;
         isRateInput = isRate;
-        document.getElementById('keypadTitle').innerText = isRate ? "I-type ang Rate per cu.m." : "I-type ang Meter Reading";
+        document.getElementById('keypadTitle').innerText = isRate ? "I-type ang Rate per cu.m." : "I-type ang Meter Reading (00000.000)";
         
-        // Ipakita agad ang kasalukuyang laman sa loob ng Keypad Screen Display pagka-click
-        let currentVal = activeInput.value || (isRate ? "45" : "00000.000");
-        document.getElementById('keypadScreenDisplay').innerText = currentVal;
-
+        if (isRate) {
+            rawDigits = activeInput.value || "45";
+        } else {
+            let currentVal = activeInput.value || "00000.000";
+            rawDigits = currentVal.replace('.', '');
+            if (rawDigits.length < 8) rawDigits = rawDigits.padStart(8, '0');
+        }
+        
+        updateKeypadScreen();
         document.getElementById('numberKeypad').style.display = 'block';
     }
 
@@ -619,53 +689,49 @@
 
     function keypadPress(char) {
         if (!activeInput) return;
-        let currentVal = document.getElementById('keypadScreenDisplay').innerText;
         
         if (isRateInput) {
-            if (currentVal === "0" && char !== '.') currentVal = char;
-            else currentVal += char;
+            if (rawDigits === "0" && char !== '.') rawDigits = char;
+            else rawDigits += char;
         } else {
-            if (char === '.' && currentVal.includes('.')) return;
-            let val = currentVal + char;
-            let parts = val.replace(/[^0-9.]/g, '').split('.');
-            if (parts.length > 2) parts = [parts[0], parts.slice(1).join('')];
-            if (parts[0].length > 5) parts[0] = parts[0].substring(0, 5);
-            if (parts[1] && parts[1].length > 3) parts[1] = parts[1].substring(0, 3);
-            currentVal = parts.length > 1 ? parts[0] + '.' + parts[1] : parts[0];
+            if (char === '.') return; // Fixed decimal na sa odometer format
+            // Shift left ang mga digits (parang mekanikal na metro)
+            rawDigits = rawDigits.substring(1) + char;
         }
 
-        document.getElementById('keypadScreenDisplay').innerText = currentVal;
-        activeInput.value = currentVal;
-        if (!isRateInput) {
-            updateMeterDisplay(activeInput);
-        }
+        updateKeypadScreen();
     }
 
     function keypadDelete() {
         if (!activeInput) return;
-        let currentVal = document.getElementById('keypadScreenDisplay').innerText;
-        currentVal = currentVal.slice(0, -1);
-        if (currentVal === "" || currentVal === "-") currentVal = isRateInput ? "0" : "00000.000";
+        
+        if (isRateInput) {
+            rawDigits = rawDigits.slice(0, -1);
+            if (rawDigits === "") rawDigits = "0";
+        } else {
+            // I-reset pabalik sa zero ang dulo kapag nag-delete
+            rawDigits = "0" + rawDigits.substring(0, 7);
+        }
 
-        document.getElementById('keypadScreenDisplay').innerText = currentVal;
-        activeInput.value = currentVal;
-        if (!isRateInput) {
+        updateKeypadScreen();
+    }
+
+    function updateKeypadScreen() {
+        let formatted = "";
+        if (isRateInput) {
+            formatted = rawDigits;
+            activeInput.value = rawDigits;
+        } else {
+            let intPart = rawDigits.substring(0, 5);
+            let decPart = rawDigits.substring(5, 8);
+            formatted = intPart + "." + decPart;
+            activeInput.value = formatted;
             updateMeterDisplay(activeInput);
         }
+        document.getElementById('keypadScreenDisplay').innerText = formatted;
     }
 
     function updateMeterDisplay(input) {
-        let val = input.value.replace(/[^0-9.]/g, '');
-        let parts = val.split('.');
-        if (parts.length > 2) {
-            val = parts[0] + '.' + parts.slice(1).join('');
-            parts = val.split('.');
-        }
-        if (parts[0].length > 5) parts[0] = parts[0].substring(0, 5);
-        if (parts[1] && parts[1].length > 3) parts[1] = parts[1].substring(0, 3);
-
-        input.value = parts.length > 1 ? parts[0] + '.' + parts[1] : parts[0];
-
         let overlayId = "overlay_" + input.id;
         let overlay = document.getElementById(overlayId);
         if (overlay) {
@@ -789,26 +855,100 @@
         document.getElementById('resultBox').style.display = 'block';
     }
 
-    function resetAllData() {
+    // --- ADMIN PIN FUNCTIONS ---
+    function requestResetWithPin() {
         closeKeypad();
-        if (confirm("Sigurado ka bang gusto mong i-reset ang cloud database sa default values?")) {
-            db.collection("water_system").doc("current_readings").set({
-                mainPrev: "00000.994",
-                prevA: "10209.800",
-                prevB: "00000.000",
-                prevC: "00000.000",
-                mainPres: "",
-                presA: "",
-                presB: "",
-                presC: "",
-                updatedAt: new Date().toLocaleString('fil-PH')
-            }).then(() => {
-                loadCloudReadings();
-                document.getElementById('totalBill').value = "";
-                document.getElementById('resultBox').style.display = 'none';
-                alert("Na-reset na ang cloud data sa default values!");
-            });
+        enteredPin = "";
+        updatePinDisplayBoxes();
+        document.getElementById('adminPinModal').style.display = 'flex';
+    }
+
+    function closePinModal() {
+        document.getElementById('adminPinModal').style.display = 'none';
+        enteredPin = "";
+    }
+
+    function clearPinInput() {
+        enteredPin = "";
+        updatePinDisplayBoxes();
+    }
+
+    // Pagpindot sa keypad para sa PIN (gumagamit din ng parehong keypad o pwede sa pamamagitan ng paggawa ng PIN entry)
+    // Para masigurong gumagana sa pamamagitan ng numeric keypad kapag lumabas ang pin modal:
+    document.addEventListener('keydown', function(e) {
+        if(document.getElementById('adminPinModal').style.display === 'flex') {
+            if(!isNaN(e.key) && enteredPin.length < 6) {
+                enteredPin += e.key;
+                updatePinDisplayBoxes();
+            } else if(e.key === 'Backspace') {
+                enteredPin = enteredPin.slice(0, -1);
+                updatePinDisplayBoxes();
+            }
         }
+    });
+
+    // Dagdag na suporta para ma-type sa pamamagitan ng pagpindot sa numpad buttons kapag bukas ang PIN modal
+    // Binago natin ang keypadPress para sumuporta rin sa PIN kung bukas ang PIN modal:
+    let oldKeypadPress = keypadPress;
+    window.keypadPress = function(char) {
+        if(document.getElementById('adminPinModal').style.display === 'flex') {
+            if(enteredPin.length < 6) {
+                enteredPin += char;
+                updatePinDisplayBoxes();
+            }
+            return;
+        }
+        oldKeypadPress(char);
+    };
+
+    let oldKeypadDelete = keypadDelete;
+    window.keypadDelete = function() {
+        if(document.getElementById('adminPinModal').style.display === 'flex') {
+            enteredPin = enteredPin.slice(0, -1);
+            updatePinDisplayBoxes();
+            return;
+        }
+        oldKeypadDelete();
+    };
+
+    function updatePinDisplayBoxes() {
+        for(let i=0; i<6; i++) {
+            let box = document.getElementById('pin-' + i);
+            if(i < enteredPin.length) {
+                box.innerText = "•"; // O maaari ding ilagay ang mismong numero kung gusto mo: enteredPin[i]
+            } else {
+                box.innerText = "";
+            }
+        }
+    }
+
+    function verifyAdminPin() {
+        if(enteredPin === CORRECT_PIN) {
+            closePinModal();
+            executeResetData();
+        } else {
+            alert("Maling PIN! Subukan muli.");
+            clearPinInput();
+        }
+    }
+
+    function executeResetData() {
+        db.collection("water_system").doc("current_readings").set({
+            mainPrev: "00000.994",
+            prevA: "10209.800",
+            prevB: "00000.000",
+            prevC: "00000.000",
+            mainPres: "",
+            presA: "",
+            presB: "",
+            presC: "",
+            updatedAt: new Date().toLocaleString('fil-PH')
+        }).then(() => {
+            loadCloudReadings();
+            document.getElementById('totalBill').value = "";
+            document.getElementById('resultBox').style.display = 'none';
+            alert("Na-reset na ang cloud data sa default values!");
+        });
     }
 
     function downloadAllSystemData() {
