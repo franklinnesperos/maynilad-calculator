@@ -102,15 +102,8 @@
             activeInput = null;
         }
 
+        // Pinindot ang mga numero sa keypad para sa Meter Readings
         window.keypadPress = function(char) {
-            if(document.getElementById('adminPinModal').style.display === 'flex') {
-                if(enteredPin.length < 6) {
-                    enteredPin += char;
-                    updatePinDisplayBoxes();
-                }
-                return;
-            }
-
             if (!activeInput) return;
             
             if (isRateInput) {
@@ -125,12 +118,6 @@
         }
 
         window.keypadDelete = function() {
-            if(document.getElementById('adminPinModal').style.display === 'flex') {
-                enteredPin = enteredPin.slice(0, -1);
-                updatePinDisplayBoxes();
-                return;
-            }
-
             if (!activeInput) return;
             
             if (isRateInput) {
@@ -283,6 +270,7 @@
             document.getElementById('resultBox').style.display = 'block';
         }
 
+        // --- ADMIN PIN FUNCTIONS & PIN KEYPAD ---
         window.requestResetWithPin = function() {
             closeKeypad();
             enteredPin = "";
@@ -300,11 +288,23 @@
             updatePinDisplayBoxes();
         }
 
+        window.pinKeypadPress = function(digit) {
+            if (enteredPin.length < 6) {
+                enteredPin += digit;
+                updatePinDisplayBoxes();
+            }
+        }
+
+        window.pinKeypadDelete = function() {
+            enteredPin = enteredPin.slice(0, -1);
+            updatePinDisplayBoxes();
+        }
+
         function updatePinDisplayBoxes() {
             for(let i=0; i<6; i++) {
                 let box = document.getElementById('pin-' + i);
                 if(i < enteredPin.length) {
-                    box.innerText = "•";
+                    box.innerText = enteredPin[i]; // Inilagay ang mismong digit para makita mo ang tina-type mo
                 } else {
                     box.innerText = "";
                 }
@@ -591,6 +591,7 @@
             color: #0275d8;
         }
 
+        /* Admin PIN Modal & Built-in Keypad para sa PIN */
         .pin-modal {
             position: fixed;
             inset: 0;
@@ -599,15 +600,15 @@
             align-items: center;
             justify-content: center;
             z-index: 2000;
-            padding: 20px;
+            padding: 15px;
         }
 
         .pin-card {
             background: #ffffff;
             width: 100%;
-            max-width: 420px;
+            max-width: 400px;
             border-radius: 16px;
-            padding: 24px;
+            padding: 20px;
             box-shadow: 0 10px 25px rgba(0,0,0,0.2);
             box-sizing: border-box;
         }
@@ -622,16 +623,16 @@
 
         .pin-subtext {
             text-align: center;
-            font-size: 0.85em;
+            font-size: 0.8em;
             color: #666;
-            margin-bottom: 20px;
+            margin-bottom: 15px;
         }
 
         .pin-boxes {
             display: flex;
             justify-content: space-between;
-            gap: 8px;
-            margin-bottom: 15px;
+            gap: 6px;
+            margin-bottom: 12px;
         }
 
         .pin-box {
@@ -651,9 +652,9 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            font-size: 0.85em;
+            font-size: 0.8em;
             color: #555;
-            margin-bottom: 20px;
+            margin-bottom: 15px;
         }
 
         .pin-clear-btn {
@@ -674,6 +675,31 @@
             font-size: 16px;
             font-weight: bold;
             cursor: pointer;
+            margin-bottom: 15px;
+        }
+
+        /* Keypad Grid para mismo sa loob ng PIN modal */
+        .pin-keypad-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 6px;
+            border-top: 1px solid #eee;
+            padding-top: 12px;
+        }
+
+        .pin-k-btn {
+            background: #f1f3f5;
+            border: 1px solid #dcedc8;
+            border-radius: 6px;
+            padding: 10px;
+            font-size: 18px;
+            font-weight: bold;
+            text-align: center;
+            cursor: pointer;
+            color: #333;
+        }
+        .pin-k-btn:active {
+            background: #e2e6ea;
         }
 
         .submeter-card {
@@ -944,12 +970,12 @@
     </div>
 </div>
 
-<!-- Admin PIN Modal -->
+<!-- Admin PIN Modal na may Built-in Keypad para makapagtiklo ng PIN -->
 <div class="pin-modal" id="adminPinModal">
     <div class="pin-card">
         <div style="text-align: right;"><button onclick="closePinModal()" style="border:none; background:none; font-size:16px; font-weight:bold; cursor:pointer;">✕</button></div>
-        <div class="pin-header-title">ILAGAY ANG ADMIN PIN</div>
-        <div class="pin-subtext">Ilagay ang iyong Admin PIN para i-reset ang mga data</div>
+        <div class="pin-header-title">ENTER ADMIN PIN</div>
+        <div class="pin-subtext">Enter your Admin PIN to reset data.</div>
         
         <div class="pin-boxes">
             <div class="pin-box" id="pin-0"></div>
@@ -961,11 +987,27 @@
         </div>
 
         <div class="pin-actions-row">
-            <span>Kailangan ng PIN para sa kaligtasan ng transaksyon</span>
+            <span>PIN required for transaction security</span>
             <button class="pin-clear-btn" onclick="clearPinInput()">Clear</button>
         </div>
 
-        <button class="btn-verify-pin" onclick="verifyAdminPin()">I-verify</button>
+        <button class="btn-verify-pin" onclick="verifyAdminPin()">Verify</button>
+
+        <!-- Sariling Keypad Grid para sa PIN Modal para siguradong makakapag-type sa cellphone -->
+        <div class="pin-keypad-grid">
+            <button type="button" class="pin-k-btn" onclick="pinKeypadPress('1')">1</button>
+            <button type="button" class="pin-k-btn" onclick="pinKeypadPress('2')">2</button>
+            <button type="button" class="pin-k-btn" onclick="pinKeypadPress('3')">3</button>
+            <button type="button" class="pin-k-btn" onclick="pinKeypadPress('4')">4</button>
+            <button type="button" class="pin-k-btn" onclick="pinKeypadPress('5')">5</button>
+            <button type="button" class="pin-k-btn" onclick="pinKeypadPress('6')">6</button>
+            <button type="button" class="pin-k-btn" onclick="pinKeypadPress('7')">7</button>
+            <button type="button" class="pin-k-btn" onclick="pinKeypadPress('8')">8</button>
+            <button type="button" class="pin-k-btn" onclick="pinKeypadPress('9')">9</button>
+            <button type="button" class="pin-k-btn" onclick="pinKeypadDelete()">⌫</button>
+            <button type="button" class="pin-k-btn" onclick="pinKeypadPress('0')">0</button>
+            <button type="button" class="pin-k-btn" style="background:#0275d8; color:#fff;" onclick="verifyAdminPin()">OK</button>
+        </div>
     </div>
 </div>
 
