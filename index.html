@@ -520,14 +520,14 @@
 </div>
 
 <script>
-    // ----- ILAGAY ANG FIREBASE CONFIG MO DITO -----
+    // ----- OPISYAL NA FIREBASE CONFIG MULA SA MAYNILAD-CALCULATOR PROJECT -----
     const firebaseConfig = {
-        apiKey: "YOUR_API_KEY",
-        authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-        projectId: "YOUR_PROJECT_ID",
-        storageBucket: "YOUR_PROJECT_ID.appspot.com",
-        messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-        appId: "YOUR_APP_ID"
+        apiKey: "AIzaSyD8kZ7TJ8_8h2kZ82HaXU4LHTpfzMzy23g",
+        authDomain: "maynilad-calculator.firebaseapp.com",
+        projectId: "maynilad-calculator",
+        storageBucket: "maynilad-calculator.firebasestorage.app",
+        messagingSenderId: "236444881363",
+        appId: "1:236444881363:web:00d1ca915629a2fc7cc826"
     };
 
     firebase.initializeApp(firebaseConfig);
@@ -690,7 +690,6 @@
 
         document.getElementById('syncStatus').innerText = "Nagse-save sa Cloud...";
         
-        // Kapag nag-compute, ang present readings ngayon ang magiging previous readings sa susunod
         db.collection("water_system").doc("current_readings").set({
             mainPrev: formattedMainPres,
             prevA: formattedPresA,
