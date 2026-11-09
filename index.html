@@ -156,6 +156,7 @@
             return parts[0].padStart(5, '0') + '.' + parts[1];
         }
 
+        // --- COMPUTE AND SYNC FUNCTION ---
         window.computeBill = async function() {
             closeKeypad();
             let rate = parseFloat(document.getElementById('ratePerCuMInput').value) || 45;
@@ -221,7 +222,7 @@
                 rate: rate,
                 A: { name: "Sub-meter Agnes", prev: formattedPrevA, pres: formattedPresA, cum: cuMA, total: payA },
                 B: { name: "Sub-meter Ate Beth", prev: formattedPrevB, pres: formattedPresB, cum: netB, total: payB },
-                Edna: { name: "Main Meter (Sister Edna)", prev: formattedMainPrev, pres: formattedPresPres || formattedMainPres, cum: totalEdnaCuM, total: payEdna }
+                Edna: { name: "Main Meter (Sister Edna)", prev: formattedMainPrev, pres: formattedMainPres, cum: totalEdnaCuM, total: payEdna }
             };
 
             document.getElementById('displayRate').innerText = "₱" + rate.toFixed(2);
