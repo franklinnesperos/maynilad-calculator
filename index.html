@@ -72,12 +72,14 @@
             updateMeterDisplay(input);
         }
 
+        // Tinitiyak na eksaktong 5 integer at 3 decimals lang ang ilalabas nang walang dobleng patong
         function cleanMeterString(valStr) {
             if (!valStr) return "00000.000";
-            let num = parseFloat(valStr);
-            if (isNaN(num)) num = 0;
-            let parts = num.toFixed(3).split('.');
-            return parts[0].padStart(5, '0') + '.' + parts[1];
+            let cleanStr = String(valStr).replace(/[^0-9.]/g, '');
+            let parts = cleanStr.split('.');
+            let intPart = (parts[0] || "0").padStart(5, '0').slice(-5);
+            let decPart = (parts[1] || "000").padEnd(3, '0').slice(0, 3);
+            return intPart + "." + decPart;
         }
 
         window.openKeypad = function(inputElem, isRate) {
@@ -102,7 +104,6 @@
             activeInput = null;
         }
 
-        // Pinindot ang mga numero sa keypad para sa Meter Readings
         window.keypadPress = function(char) {
             if (!activeInput) return;
             
@@ -304,7 +305,7 @@
             for(let i=0; i<6; i++) {
                 let box = document.getElementById('pin-' + i);
                 if(i < enteredPin.length) {
-                    box.innerText = enteredPin[i]; // Inilagay ang mismong digit para makita mo ang tina-type mo
+                    box.innerText = enteredPin[i];
                 } else {
                     box.innerText = "";
                 }
@@ -591,7 +592,6 @@
             color: #0275d8;
         }
 
-        /* Admin PIN Modal & Built-in Keypad para sa PIN */
         .pin-modal {
             position: fixed;
             inset: 0;
@@ -678,7 +678,6 @@
             margin-bottom: 15px;
         }
 
-        /* Keypad Grid para mismo sa loob ng PIN modal */
         .pin-keypad-grid {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
@@ -751,7 +750,6 @@
             font-size: 15px;
             cursor: pointer;
             font-weight: bold;
-            margin-top: 15px;
         }
 
         .result-box {
@@ -970,7 +968,7 @@
     </div>
 </div>
 
-<!-- Admin PIN Modal na may Built-in Keypad para makapagtiklo ng PIN -->
+<!-- Admin PIN Modal na may Built-in Keypad -->
 <div class="pin-modal" id="adminPinModal">
     <div class="pin-card">
         <div style="text-align: right;"><button onclick="closePinModal()" style="border:none; background:none; font-size:16px; font-weight:bold; cursor:pointer;">✕</button></div>
@@ -993,7 +991,6 @@
 
         <button class="btn-verify-pin" onclick="verifyAdminPin()">Verify</button>
 
-        <!-- Sariling Keypad Grid para sa PIN Modal para siguradong makakapag-type sa cellphone -->
         <div class="pin-keypad-grid">
             <button type="button" class="pin-k-btn" onclick="pinKeypadPress('1')">1</button>
             <button type="button" class="pin-k-btn" onclick="pinKeypadPress('2')">2</button>
