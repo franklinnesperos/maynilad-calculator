@@ -123,6 +123,7 @@
             overflow: hidden;
         }
 
+        /* Keypad Popup Improvements */
         .keypad-popup {
             position: fixed;
             bottom: 0;
@@ -150,6 +151,21 @@
             font-weight: bold;
             color: #495057;
             font-size: 0.95em;
+        }
+
+        .keypad-screen {
+            background: #f1f3f5;
+            border: 2px solid #ced4da;
+            border-radius: 8px;
+            padding: 10px;
+            font-size: 22px;
+            font-family: monospace;
+            font-weight: bold;
+            text-align: right;
+            margin-bottom: 12px;
+            letter-spacing: 1px;
+            min-height: 35px;
+            color: #000;
         }
 
         .keypad-close {
@@ -480,12 +496,14 @@
     </div>
 </div>
 
-<!-- Naka-box at Naka-pop up na Numeric Keypad -->
+<!-- Naka-box at Naka-pop up na Numeric Keypad na may Screen Display -->
 <div class="keypad-popup" id="numberKeypad">
     <div class="keypad-header">
         <span id="keypadTitle">Ilagay ang Numero</span>
         <button class="keypad-close" onclick="closeKeypad()">ISARA</button>
     </div>
+    <!-- Dito na lalabas ang mismong tina-type mong numero sa pop-up -->
+    <div class="keypad-screen" id="keypadScreenDisplay">0</div>
     <div class="keypad-grid">
         <button class="keypad-btn" onclick="keypadPress('1')">1</button>
         <button class="keypad-btn" onclick="keypadPress('2')">2</button>
@@ -550,7 +568,7 @@
                 setInputValue('prevB', data.prevB || "00000.000");
                 setInputValue('prevC', data.prevC || "00000.000");
                 
-                ['mainPres', 'presA', 'presB', 'presC'].forEach(id => setInputValue(id, ""));
+                ['mainPres', 'presA', 'presB', 'presC'].forEach(id => setInputValue(id, "00000.000"));
 
                 document.getElementById('syncStatus').innerText = "✔ Nakakonekta sa Cloud (Real-time Sync Active)";
             } else {
@@ -568,14 +586,29 @@
 
     function setInputValue(id, val) {
         let input = document.getElementById(id);
-        input.value = val;
+        if(!input) return;
+        let cleanVal = cleanMeterString(val);
+        input.value = cleanVal;
         updateMeterDisplay(input);
+    }
+
+    function cleanMeterString(valStr) {
+        if (!valStr) return "00000.000";
+        let num = parseFloat(valStr);
+        if (isNaN(num)) num = 0;
+        let parts = num.toFixed(3).split('.');
+        return parts[0].padStart(5, '0') + '.' + parts[1];
     }
 
     function openKeypad(inputElem, isRate) {
         activeInput = inputElem;
         isRateInput = isRate;
         document.getElementById('keypadTitle').innerText = isRate ? "I-type ang Rate per cu.m." : "I-type ang Meter Reading";
+        
+        // Ipakita agad ang kasalukuyang laman sa loob ng Keypad Screen Display pagka-click
+        let currentVal = activeInput.value || (isRate ? "45" : "00000.000");
+        document.getElementById('keypadScreenDisplay').innerText = currentVal;
+
         document.getElementById('numberKeypad').style.display = 'block';
     }
 
@@ -586,22 +619,36 @@
 
     function keypadPress(char) {
         if (!activeInput) return;
+        let currentVal = document.getElementById('keypadScreenDisplay').innerText;
+        
         if (isRateInput) {
-            activeInput.value += char;
+            if (currentVal === "0" && char !== '.') currentVal = char;
+            else currentVal += char;
         } else {
-            let val = activeInput.value + char;
+            if (char === '.' && currentVal.includes('.')) return;
+            let val = currentVal + char;
             let parts = val.replace(/[^0-9.]/g, '').split('.');
             if (parts.length > 2) parts = [parts[0], parts.slice(1).join('')];
             if (parts[0].length > 5) parts[0] = parts[0].substring(0, 5);
             if (parts[1] && parts[1].length > 3) parts[1] = parts[1].substring(0, 3);
-            activeInput.value = parts.length > 1 ? parts[0] + '.' + parts[1] : parts[0];
+            currentVal = parts.length > 1 ? parts[0] + '.' + parts[1] : parts[0];
+        }
+
+        document.getElementById('keypadScreenDisplay').innerText = currentVal;
+        activeInput.value = currentVal;
+        if (!isRateInput) {
             updateMeterDisplay(activeInput);
         }
     }
 
     function keypadDelete() {
         if (!activeInput) return;
-        activeInput.value = activeInput.value.slice(0, -1);
+        let currentVal = document.getElementById('keypadScreenDisplay').innerText;
+        currentVal = currentVal.slice(0, -1);
+        if (currentVal === "" || currentVal === "-") currentVal = isRateInput ? "0" : "00000.000";
+
+        document.getElementById('keypadScreenDisplay').innerText = currentVal;
+        activeInput.value = currentVal;
         if (!isRateInput) {
             updateMeterDisplay(activeInput);
         }
