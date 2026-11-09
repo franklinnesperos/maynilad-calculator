@@ -31,7 +31,7 @@
         
         let enteredPin = "";
         const CORRECT_PIN = "082707";
-        let pinTargetAction = "reset"; // "reset" o "history"
+        let pinTargetAction = "reset";
 
         window.onload = function() {
             loadCloudReadings();
@@ -157,7 +157,6 @@
             return parts[0].padStart(5, '0') + '.' + parts[1];
         }
 
-        // --- COMPUTE, CLOUD SYNC & AUTOMATIC HISTORY RECORDING ---
         window.computeBill = async function() {
             closeKeypad();
             let rate = parseFloat(document.getElementById('ratePerCuMInput').value) || 45;
@@ -203,7 +202,6 @@
             let timeStampNow = new Date().toLocaleString('fil-PH');
             
             try {
-                // 1. I-update ang kasalukuyang basa sa Central Document
                 await setDoc(doc(db, "water_system", "current_readings"), {
                     mainPrev: formattedMainPres,
                     prevA: formattedPresA,
@@ -216,7 +214,6 @@
                     updatedAt: timeStampNow
                 });
 
-                // 2. MAGTสร้าง NG BAGONG RECORD SA CLOUD HISTORY LOGS (Hindi mabubura kailanman)
                 await addDoc(collection(db, "reading_history"), {
                     timestamp: new Date().getTime(),
                     dateString: timeStampNow,
@@ -272,7 +269,7 @@
             document.getElementById('resultBox').style.display = 'block';
         }
 
-        // --- ADMIN PIN FUNCTIONS & ACTIONS ---
+        // --- ADMIN PIN FUNCTIONS WITH INSTANT TOUCH RESPONSE ---
         window.requestResetWithPin = function() {
             closeKeypad();
             pinTargetAction = "reset";
@@ -299,14 +296,16 @@
             updatePinDisplayBoxes();
         }
 
-        window.pinKeypadPress = function(digit) {
+        window.pinKeypadPress = function(digit, event) {
+            if(event) event.preventDefault(); // Iwas double-tap zoom delay sa mobile
             if (enteredPin.length < 6) {
                 enteredPin += digit;
                 updatePinDisplayBoxes();
             }
         }
 
-        window.pinKeypadDelete = function() {
+        window.pinKeypadDelete = function(event) {
+            if(event) event.preventDefault();
             enteredPin = enteredPin.slice(0, -1);
             updatePinDisplayBoxes();
         }
@@ -322,7 +321,8 @@
             }
         }
 
-        window.verifyAdminPin = function() {
+        window.verifyAdminPin = function(event) {
+            if(event) event.preventDefault();
             if(enteredPin === CORRECT_PIN) {
                 closePinModal();
                 if (pinTargetAction === "reset") {
@@ -336,14 +336,13 @@
             }
         }
 
-        // --- FETCH AND DISPLAY HISTORY LOGS ---
         async function fetchAndShowHistory() {
             const historyListContainer = document.getElementById('historyList');
             historyListContainer.innerHTML = "Kinukuha ang mga nakaraang record sa Cloud...";
             document.getElementById('historyModal').style.display = 'flex';
 
             try {
-                const q = query(collection(db, "reading_history"), orderBy("timestamp", "desc"), limit(24)); // Huling 24 records (2 taon)
+                const q = query(collection(db, "reading_history"), orderBy("timestamp", "desc"), limit(24));
                 const querySnapshot = await getDocs(q);
 
                 if (querySnapshot.empty) {
@@ -635,6 +634,7 @@
             cursor: pointer;
             text-align: center;
             color: #333;
+            touch-action: manipulation;
         }
 
         .keypad-btn:active {
@@ -660,7 +660,7 @@
         .pin-card, .history-card {
             background: #ffffff;
             width: 100%;
-            max-width: 450px;
+            max-width: 400px;
             border-radius: 16px;
             padding: 20px;
             box-shadow: 0 10px 25px rgba(0,0,0,0.2);
@@ -732,6 +732,7 @@
             font-weight: bold;
             cursor: pointer;
             margin-bottom: 15px;
+            touch-action: manipulation;
         }
 
         .pin-keypad-grid {
@@ -746,12 +747,18 @@
             background: #f1f3f5;
             border: 1px solid #dcedc8;
             border-radius: 6px;
-            padding: 10px;
+            padding: 12px;
             font-size: 18px;
             font-weight: bold;
             text-align: center;
             cursor: pointer;
             color: #333;
+            touch-action: manipulation; /* Inaalis ang touch delay para instant response */
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .pin-k-btn:active {
+            background: #cbd5e1;
         }
 
         .history-item-card {
@@ -1029,7 +1036,7 @@
     </div>
 </div>
 
-<!-- Admin PIN Modal na may Built-in Keypad -->
+<!-- Admin PIN Modal na may Instant Touch Keypad -->
 <div class="pin-modal" id="adminPinModal">
     <div class="pin-card">
         <div style="text-align: right;"><button onclick="closePinModal()" style="border:none; background:none; font-size:16px; font-weight:bold; cursor:pointer;">✕</button></div>
@@ -1050,21 +1057,22 @@
             <button class="pin-clear-btn" onclick="clearPinInput()">Clear</button>
         </div>
 
-        <button class="btn-verify-pin" onclick="verifyAdminPin()">Verify</button>
+        <button class="btn-verify-pin" ontouchstart="verifyAdminPin(event)" onclick="verifyAdminPin(event)">Verify</button>
 
+        <!-- Paggamit ng ontouchstart + onclick para sa instant response sa mobile -->
         <div class="pin-keypad-grid">
-            <button type="button" class="pin-k-btn" onclick="pinKeypadPress('1')">1</button>
-            <button type="button" class="pin-k-btn" onclick="pinKeypadPress('2')">2</button>
-            <button type="button" class="pin-k-btn" onclick="pinKeypadPress('3')">3</button>
-            <button type="button" class="pin-k-btn" onclick="pinKeypadPress('4')">4</button>
-            <button type="button" class="pin-k-btn" onclick="pinKeypadPress('5')">5</button>
-            <button type="button" class="pin-k-btn" onclick="pinKeypadPress('6')">6</button>
-            <button type="button" class="pin-k-btn" onclick="pinKeypadPress('7')">7</button>
-            <button type="button" class="pin-k-btn" onclick="pinKeypadPress('8')">8</button>
-            <button type="button" class="pin-k-btn" onclick="pinKeypadPress('9')">9</button>
-            <button type="button" class="pin-k-btn" onclick="pinKeypadDelete()">⌫</button>
-            <button type="button" class="pin-k-btn" onclick="pinKeypadPress('0')">0</button>
-            <button type="button" class="pin-k-btn" style="background:#0275d8; color:#fff;" onclick="verifyAdminPin()">OK</button>
+            <button type="button" class="pin-k-btn" ontouchstart="pinKeypadPress('1', event)" onclick="pinKeypadPress('1', event)">1</button>
+            <button type="button" class="pin-k-btn" ontouchstart="pinKeypadPress('2', event)" onclick="pinKeypadPress('2', event)">2</button>
+            <button type="button" class="pin-k-btn" ontouchstart="pinKeypadPress('3', event)" onclick="pinKeypadPress('3', event)">3</button>
+            <button type="button" class="pin-k-btn" ontouchstart="pinKeypadPress('4', event)" onclick="pinKeypadPress('4', event)">4</button>
+            <button type="button" class="pin-k-btn" ontouchstart="pinKeypadPress('5', event)" onclick="pinKeypadPress('5', event)">5</button>
+            <button type="button" class="pin-k-btn" ontouchstart="pinKeypadPress('6', event)" onclick="pinKeypadPress('6', event)">6</button>
+            <button type="button" class="pin-k-btn" ontouchstart="pinKeypadPress('7', event)" onclick="pinKeypadPress('7', event)">7</button>
+            <button type="button" class="pin-k-btn" ontouchstart="pinKeypadPress('8', event)" onclick="pinKeypadPress('8', event)">8</button>
+            <button type="button" class="pin-k-btn" ontouchstart="pinKeypadPress('9', event)" onclick="pinKeypadPress('9', event)">9</button>
+            <button type="button" class="pin-k-btn" ontouchstart="pinKeypadDelete(event)" onclick="pinKeypadDelete(event)">⌫</button>
+            <button type="button" class="pin-k-btn" ontouchstart="pinKeypadPress('0', event)" onclick="pinKeypadPress('0', event)">0</button>
+            <button type="button" class="pin-k-btn" style="background:#0275d8; color:#fff;" ontouchstart="verifyAdminPin(event)" onclick="verifyAdminPin(event)">OK</button>
         </div>
     </div>
 </div>
@@ -1076,9 +1084,7 @@
             <h3 style="margin:0; color:#0275d8;">📜 Cloud History Logs</h3>
             <button onclick="closeHistoryModal()" style="border:none; background:#d9534f; color:white; border-radius:4px; padding:4px 10px; font-weight:bold; cursor:pointer;">ISARA</button>
         </div>
-        <div id="historyList">
-            <!-- Dito lalabas ang lahat ng nakaraang buwan ng kwentahan -->
-        </div>
+        <div id="historyList"></div>
     </div>
 </div>
 
