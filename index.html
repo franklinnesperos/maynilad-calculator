@@ -10,7 +10,7 @@
     <!-- Firebase App & Firestore SDKs (Modular v10) -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getFirestore, doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { getFirestore, doc, getDoc, setDoc, collection, addDoc, getDocs, query, orderBy, limit } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyD8kZ7TJ8_8h2kZ82HaXU4LHTpfzMzy23g",
@@ -31,6 +31,7 @@
         
         let enteredPin = "";
         const CORRECT_PIN = "082707";
+        let pinTargetAction = "reset"; // "reset" o "history"
 
         window.onload = function() {
             loadCloudReadings();
@@ -156,7 +157,7 @@
             return parts[0].padStart(5, '0') + '.' + parts[1];
         }
 
-        // --- COMPUTE AND SYNC FUNCTION ---
+        // --- COMPUTE, CLOUD SYNC & AUTOMATIC HISTORY RECORDING ---
         window.computeBill = async function() {
             closeKeypad();
             let rate = parseFloat(document.getElementById('ratePerCuMInput').value) || 45;
@@ -199,8 +200,10 @@
             let formattedPresC = formatMeter(presC);
 
             document.getElementById('syncStatus').innerText = "Nagse-save sa Cloud...";
+            let timeStampNow = new Date().toLocaleString('fil-PH');
             
             try {
+                // 1. I-update ang kasalukuyang basa sa Central Document
                 await setDoc(doc(db, "water_system", "current_readings"), {
                     mainPrev: formattedMainPres,
                     prevA: formattedPresA,
@@ -210,9 +213,25 @@
                     presA: "",
                     presB: "",
                     presC: "",
-                    updatedAt: new Date().toLocaleString('fil-PH')
+                    updatedAt: timeStampNow
                 });
-                document.getElementById('syncStatus').innerText = "✔ Tagumpay na na-sync sa Cloud Database!";
+
+                // 2. MAGTสร้าง NG BAGONG RECORD SA CLOUD HISTORY LOGS (Hindi mabubura kailanman)
+                await addDoc(collection(db, "reading_history"), {
+                    timestamp: new Date().getTime(),
+                    dateString: timeStampNow,
+                    rate: rate,
+                    mainTotalBill: (mainTotalCuM * rate),
+                    readings: {
+                        main: { prev: formattedMainPrev, pres: formattedMainPres, cum: mainTotalCuM },
+                        subA: { name: "Agnes", prev: formattedPrevA, pres: formattedPresA, cum: cuMA, pay: payA },
+                        subB: { name: "Sister Beth", prev: formattedPrevB, pres: formattedPresB, cum: netB, pay: payB },
+                        subC: { name: "Sister Edna", prev: formattedPrevC, pres: formattedPresC, cum: cuMC },
+                        mainEdna: { cum: totalEdnaCuM, pay: payEdna }
+                    }
+                });
+
+                document.getElementById('syncStatus').innerText = "✔ Tagumpay na na-sync at na-record sa Cloud History!";
             } catch (error) {
                 console.error("Error saving to cloud:", error);
                 document.getElementById('syncStatus').innerText = "⚠ Nabigong i-save sa Cloud.";
@@ -253,9 +272,18 @@
             document.getElementById('resultBox').style.display = 'block';
         }
 
-        // --- ADMIN PIN FUNCTIONS & PIN KEYPAD ---
+        // --- ADMIN PIN FUNCTIONS & ACTIONS ---
         window.requestResetWithPin = function() {
             closeKeypad();
+            pinTargetAction = "reset";
+            enteredPin = "";
+            updatePinDisplayBoxes();
+            document.getElementById('adminPinModal').style.display = 'flex';
+        }
+
+        window.requestHistoryWithPin = function() {
+            closeKeypad();
+            pinTargetAction = "history";
             enteredPin = "";
             updatePinDisplayBoxes();
             document.getElementById('adminPinModal').style.display = 'flex';
@@ -297,11 +325,57 @@
         window.verifyAdminPin = function() {
             if(enteredPin === CORRECT_PIN) {
                 closePinModal();
-                executeResetData();
+                if (pinTargetAction === "reset") {
+                    executeResetData();
+                } else if (pinTargetAction === "history") {
+                    fetchAndShowHistory();
+                }
             } else {
                 alert("Maling PIN! Subukan muli.");
                 clearPinInput();
             }
+        }
+
+        // --- FETCH AND DISPLAY HISTORY LOGS ---
+        async function fetchAndShowHistory() {
+            const historyListContainer = document.getElementById('historyList');
+            historyListContainer.innerHTML = "Kinukuha ang mga nakaraang record sa Cloud...";
+            document.getElementById('historyModal').style.display = 'flex';
+
+            try {
+                const q = query(collection(db, "reading_history"), orderBy("timestamp", "desc"), limit(24)); // Huling 24 records (2 taon)
+                const querySnapshot = await getDocs(q);
+
+                if (querySnapshot.empty) {
+                    historyListContainer.innerHTML = "<p style='text-align:center;'>Walang nahanap na nakaraang history log.</p>";
+                    return;
+                }
+
+                let historyHtml = "";
+                querySnapshot.forEach((docSnap) => {
+                    let item = docSnap.data();
+                    let r = item.readings;
+                    historyHtml += `
+                        <div class="history-item-card">
+                            <div class="history-date">📅 Petsa: ${item.dateString}</div>
+                            <div><strong>Rate:</strong> ₱${item.rate.toFixed(2)} / cu.m.</div>
+                            <hr style="border-top:1px dashed #ccc; margin:8px 0;">
+                            <div><strong>Agnes (Sub A):</strong> ${r.subA.cum.toFixed(3)} cu.m. = <strong>₱${r.subA.pay.toFixed(2)}</strong></div>
+                            <div><strong>Sister Beth (Sub B):</strong> ${r.subB.cum.toFixed(3)} cu.m. = <strong>₱${r.subB.pay.toFixed(2)}</strong></div>
+                            <div><strong>Sister Edna (Main):</strong> ${r.mainEdna.cum.toFixed(3)} cu.m. = <strong>₱${r.mainEdna.pay.toFixed(2)}</strong></div>
+                        </div>
+                    `;
+                });
+
+                historyListContainer.innerHTML = historyHtml;
+            } catch (error) {
+                console.error("Error fetching history:", error);
+                historyListContainer.innerHTML = "<p style='color:red;'>May error sa pagkuha ng history log.</p>";
+            }
+        }
+
+        window.closeHistoryModal = function() {
+            document.getElementById('historyModal').style.display = 'none';
         }
 
         async function executeResetData() {
@@ -422,8 +496,21 @@
             text-align: center;
             font-size: 0.85em;
             color: #28a745;
-            margin-bottom: 25px;
+            margin-bottom: 20px;
             font-weight: bold;
+        }
+
+        .btn-history-trigger {
+            display: block;
+            margin: 0 auto 20px auto;
+            background-color: #6c757d;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 0.85em;
+            cursor: pointer;
         }
 
         .section-title {
@@ -559,7 +646,7 @@
             color: #0275d8;
         }
 
-        .pin-modal {
+        .pin-modal, .history-modal {
             position: fixed;
             inset: 0;
             background: rgba(0, 0, 0, 0.5);
@@ -570,14 +657,16 @@
             padding: 15px;
         }
 
-        .pin-card {
+        .pin-card, .history-card {
             background: #ffffff;
             width: 100%;
-            max-width: 400px;
+            max-width: 450px;
             border-radius: 16px;
             padding: 20px;
             box-shadow: 0 10px 25px rgba(0,0,0,0.2);
             box-sizing: border-box;
+            max-height: 85vh;
+            overflow-y: auto;
         }
 
         .pin-header-title {
@@ -664,8 +753,20 @@
             cursor: pointer;
             color: #333;
         }
-        .pin-k-btn:active {
-            background: #e2e6ea;
+
+        .history-item-card {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 10px;
+            font-size: 0.9em;
+        }
+
+        .history-date {
+            color: #0275d8;
+            font-weight: bold;
+            margin-bottom: 5px;
         }
 
         .submeter-card {
@@ -788,6 +889,7 @@
 <div class="container">
     <h2>Maynilad Water Bill Calculator</h2>
     <div class="sync-status" id="syncStatus">Kumokonekta sa Cloud Database...</div>
+    <button type="button" class="btn-history-trigger" onclick="requestHistoryWithPin()">📜 TINGNAN ANG CLOUD HISTORY</button>
     
     <div class="section-title">1. Rates & Main Bill Info</div>
     <div class="grid-2">
@@ -932,7 +1034,7 @@
     <div class="pin-card">
         <div style="text-align: right;"><button onclick="closePinModal()" style="border:none; background:none; font-size:16px; font-weight:bold; cursor:pointer;">✕</button></div>
         <div class="pin-header-title">ENTER ADMIN PIN</div>
-        <div class="pin-subtext">Enter your Admin PIN to reset data.</div>
+        <div class="pin-subtext">Enter your Admin PIN to proceed.</div>
         
         <div class="pin-boxes">
             <div class="pin-box" id="pin-0"></div>
@@ -963,6 +1065,19 @@
             <button type="button" class="pin-k-btn" onclick="pinKeypadDelete()">⌫</button>
             <button type="button" class="pin-k-btn" onclick="pinKeypadPress('0')">0</button>
             <button type="button" class="pin-k-btn" style="background:#0275d8; color:#fff;" onclick="verifyAdminPin()">OK</button>
+        </div>
+    </div>
+</div>
+
+<!-- History Log Modal -->
+<div class="history-modal" id="historyModal">
+    <div class="history-card">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+            <h3 style="margin:0; color:#0275d8;">📜 Cloud History Logs</h3>
+            <button onclick="closeHistoryModal()" style="border:none; background:#d9534f; color:white; border-radius:4px; padding:4px 10px; font-weight:bold; cursor:pointer;">ISARA</button>
+        </div>
+        <div id="historyList">
+            <!-- Dito lalabas ang lahat ng nakaraang buwan ng kwentahan -->
         </div>
     </div>
 </div>
