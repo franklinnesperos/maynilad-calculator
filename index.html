@@ -45,7 +45,7 @@
                 if (docSnap.exists()) {
                     let data = docSnap.data();
                     setInputValue('mainPrev', data.mainPrev || "00000.994");
-                    setInputValue('prevA', data.prevA || "10209.800");
+                    setInputValue('prevA', data.prevA || "00209.800");
                     setInputValue('prevB', data.prevB || "00000.000");
                     setInputValue('prevC', data.prevC || "00000.000");
                     
@@ -54,7 +54,7 @@
                     document.getElementById('syncStatus').innerText = "✔ Nakakonekta sa Cloud (Real-time Sync Active)";
                 } else {
                     setInputValue('mainPrev', "00000.994");
-                    setInputValue('prevA', "10209.800");
+                    setInputValue('prevA', "00209.800");
                     setInputValue('prevB', "00000.000");
                     setInputValue('prevC', "00000.000");
                     document.getElementById('syncStatus').innerText = "✔ Handa na sa Cloud Database";
