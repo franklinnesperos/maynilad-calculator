@@ -87,7 +87,7 @@
             document.getElementById('keypadTitle').innerText = isRate ? "I-type ang Rate per cu.m." : "I-type ang Meter Reading (00000.000)";
             
             if (isRate) {
-                rawDigits = activeInput.value || "45";
+                rawDigits = activeInput.value || "50";
             } else {
                 let currentVal = activeInput.value || "00000.000";
                 rawDigits = currentVal.replace('.', '');
@@ -902,7 +902,7 @@
     <div class="grid-2">
         <div class="form-group">
             <label>Rate per cu.m. (₱):</label>
-            <input type="number" id="ratePerCuMInput" value="45" step="any" onclick="openKeypad(this, true)" onfocus="openKeypad(this, true)">
+            <input type="number" id="ratePerCuMInput" value="50" step="any" onclick="openKeypad(this, true)" onfocus="openKeypad(this, true)">
         </div>
         <div class="form-group">
             <label>Total Maynilad Bill (₱) (Optional):</label>
