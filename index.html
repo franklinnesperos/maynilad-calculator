@@ -8,7 +8,7 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getFirestore, doc, getDoc, setDoc, collection, addDoc, getDocs, query, where, orderBy, limit } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { getFirestore, doc, getDoc, setDoc, collection, addDoc, getDocs, query, orderBy, limit } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyD8kZ7TJ8_8h2kZ82HaXU4LHTpfzMzy23g",
@@ -72,20 +72,51 @@
         }
 
         async function loadPaymentHistoryFromCloud() {
+            const statusEl = document.getElementById('paymentRecordStatus');
+            const listEl = document.getElementById('savedPaymentsPreview');
             try {
-                const q = query(collection(db, "payment_records"), orderBy("timestamp", "desc"), limit(60));
-                const snap = await getDocs(q);
+                const snap = await getDocs(collection(db, "payment_records"));
                 paymentHistoryByKey = { A: [], B: [], Edna: [] };
 
                 snap.forEach((docSnap) => {
                     const p = docSnap.data();
-                    if (p.personKey && paymentHistoryByKey[p.personKey]) {
+                    if (p && p.personKey && paymentHistoryByKey[p.personKey]) {
                         paymentHistoryByKey[p.personKey].push(p);
                     }
                 });
+
+                Object.keys(paymentHistoryByKey).forEach((k) => {
+                    paymentHistoryByKey[k].sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+                });
+
+                renderSavedPaymentsPreview(listEl);
             } catch (error) {
                 console.error("Error loading payment history:", error);
+                if (statusEl) {
+                    statusEl.innerHTML = `⚠ Hindi ma-load ang Payment History: <strong>${error.message}</strong>`;
+                }
             }
+        }
+
+        function renderSavedPaymentsPreview(listEl) {
+            if (!listEl) return;
+            const allRecent = [
+                ...paymentHistoryByKey.A,
+                ...paymentHistoryByKey.B,
+                ...paymentHistoryByKey.Edna
+            ].sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0)).slice(0, 6);
+
+            if (allRecent.length === 0) {
+                listEl.innerHTML = "<span style='color:#666;'>Wala pang naka-record na Paid OR sa Cloud.</span>";
+                return;
+            }
+
+            let html = "<strong>Mga Naka-save na Paid OR (Lalabas sa Resibo):</strong><ul style='margin:6px 0 0 18px; padding:0;'>";
+            allRecent.forEach((p) => {
+                html += `<li><strong>${p.accountName}</strong> — OR#: <code>${p.orNumber}</code> | Petsa: ${p.payDate} | Amount: <strong>₱${Number(p.amount).toFixed(2)}</strong></li>`;
+            });
+            html += "</ul>";
+            listEl.innerHTML = html;
         }
 
         function generateReceiptNumber(personKey) {
@@ -116,7 +147,7 @@
             const personNames = {
                 A: "Agnes",
                 B: "Ate Beth",
-                Edna: "Ate Edna"
+                Edna: "Edna Alvarez"
             };
 
             const orNumber = generateReceiptNumber(personKey);
@@ -137,8 +168,9 @@
                 if (!paymentHistoryByKey[personKey]) paymentHistoryByKey[personKey] = [];
                 paymentHistoryByKey[personKey].unshift(recordObj);
 
+                renderSavedPaymentsPreview(document.getElementById('savedPaymentsPreview'));
                 document.getElementById('payAmountInput').value = "";
-                statusEl.innerHTML = `✔ Na-save na ang bayad para kay <strong>${recordObj.accountName}</strong> | Auto OR#: <strong>${orNumber}</strong> (${payDate} - ₱${payAmount.toFixed(2)}). Lalabas ito sa Payment History ng resibo sa susunod na billing.`;
+                statusEl.innerHTML = `✔ Na-save na ang bayad para kay <strong>${recordObj.accountName}</strong> | Auto OR#: <strong>${orNumber}</strong> (${payDate} - ₱${payAmount.toFixed(2)}).`;
             } catch (error) {
                 console.error("Error saving payment:", error);
                 statusEl.innerText = "⚠ May error sa pag-save ng Paid record.";
@@ -351,24 +383,175 @@
                     <td><strong>Agnes</strong></td>
                     <td>${cuMA.toFixed(3)} cu.m.</td>
                     <td><strong>₱${payA.toFixed(2)}</strong></td>
-                    <td><button type="button" class="btn-receipt" onclick="saveReceiptImage('A')">Save Receipt</button></td>
+                    <td><button type="button" class="btn-receipt" onclick="saveReceiptImage('A')">Save Receipt (.PNG)</button></td>
                 </tr>
                 <tr>
                     <td><strong>Ate Beth</strong></td>
                     <td>${netB.toFixed(3)} cu.m.</td>
                     <td><strong>₱${payB.toFixed(2)}</strong></td>
-                    <td><button type="button" class="btn-receipt" onclick="saveReceiptImage('B')">Save Receipt</button></td>
+                    <td><button type="button" class="btn-receipt" onclick="saveReceiptImage('B')">Save Receipt (.PNG)</button></td>
                 </tr>
                 <tr style="background-color: #e2f0d9;">
                     <td><strong>Edna Alvarez</strong></td>
                     <td><strong>${totalEdnaCuM.toFixed(3)} cu.m.</strong></td>
                     <td><strong>₱${payEdna.toFixed(2)}</strong></td>
-                    <td><button type="button" class="btn-receipt" onclick="saveReceiptImage('Edna')">Save Receipt</button></td>
+                    <td><button type="button" class="btn-receipt" onclick="saveReceiptImage('Edna')">Save Receipt (.PNG)</button></td>
                 </tr>
             `;
 
             document.getElementById('tableBody').innerHTML = html;
             document.getElementById('resultBox').style.display = 'block';
+        };
+
+        function buildReceiptHTML(key) {
+            const item = calculatedData[key];
+            if (!item) return "";
+
+            const historyRows = paymentHistoryByKey[key] || [];
+            let historyTbodyHtml = "";
+            if (historyRows.length === 0) {
+                historyTbodyHtml = `
+                    <tr>
+                        <td style="text-align:left;">0.00</td>
+                        <td style="text-align:center;">---</td>
+                        <td style="text-align:right;">---</td>
+                    </tr>
+                `;
+            } else {
+                historyRows.slice(0, 3).forEach((entry) => {
+                    historyTbodyHtml += `
+                        <tr>
+                            <td style="text-align:left;">${Number(entry.amount).toFixed(2)}</td>
+                            <td style="text-align:center;">${entry.orNumber}</td>
+                            <td style="text-align:right;">${entry.payDate}</td>
+                        </tr>
+                    `;
+                });
+            }
+
+            return `
+                <div class="rcpt-center rcpt-title">MAYNILAD SUB-BILL STATEMENT</div>
+                <div class="rcpt-center" style="font-size:10px;">For the month of: ${calculatedData.billingMonth || ""}</div>
+
+                <div class="rcpt-sec-hdr">SERVICE INFORMATION</div>
+                <div class="rcpt-line"><span class="rcpt-bold">Account Name:</span> ${item.accountName}</div>
+                <div class="rcpt-line"><span class="rcpt-bold">Service Address:</span> ${item.serviceAddress}</div>
+
+                <div class="rcpt-sec-hdr">METERING INFORMATION</div>
+                <table class="rcpt-table">
+                    <thead>
+                        <tr>
+                            <th style="text-align:left;">Present Reading</th>
+                            <th style="text-align:center;">Previous Reading</th>
+                            <th style="text-align:right;">Consumption Qty</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td style="text-align:left; font-weight:bold;">${item.pres}</td>
+                            <td style="text-align:center; font-weight:bold;">${item.prev}</td>
+                            <td style="text-align:right; font-weight:bold;">${item.cum.toFixed(3)} cu. m.</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <div class="rcpt-sec-hdr">PAYMENT HISTORY</div>
+                <table class="rcpt-table">
+                    <thead>
+                        <tr>
+                            <th style="text-align:left;">Total Amount</th>
+                            <th style="text-align:center;">Official Receipt</th>
+                            <th style="text-align:right;">Date</th>
+                        </tr>
+                    </thead>
+                    <tbody>${historyTbodyHtml}</tbody>
+                </table>
+
+                <div class="rcpt-total-box">
+                    <span>TOTAL AMOUNT</span>
+                    <span>₱${item.total.toFixed(2)}</span>
+                </div>
+                <div class="rcpt-footer-note">DEVELOPER: Franklin Nesperos</div>
+            `;
+        }
+
+        window.saveReceiptImage = function(key) {
+            let item = calculatedData[key];
+            if (!item) {
+                alert("Paki-kumpyutin muna ang bill bago mag-save ng resibo.");
+                return;
+            }
+
+            let receiptElement = document.getElementById('singleReceiptCapture');
+            receiptElement.innerHTML = buildReceiptHTML(key);
+            receiptElement.style.left = '0';
+            receiptElement.style.top = '0';
+
+            html2canvas(receiptElement, { scale: 2 }).then(canvas => {
+                receiptElement.style.left = '-9999px';
+                let link = document.createElement('a');
+                link.download = `Resibo_${item.accountName.replace(/\s+/g, '_')}.png`;
+                link.href = canvas.toDataURL('image/png');
+                link.click();
+            });
+        };
+
+        window.printAllThreeReceiptsA4 = function() {
+            if (!calculatedData.A || !calculatedData.B || !calculatedData.Edna) {
+                alert("Paki-kumpyutin muna ang bill bago i-print ang tatlong resibo.");
+                return;
+            }
+
+            document.getElementById('printSlotA').innerHTML = buildReceiptHTML('A');
+            document.getElementById('printSlotB').innerHTML = buildReceiptHTML('B');
+            document.getElementById('printSlotEdna').innerHTML = buildReceiptHTML('Edna');
+
+            window.print();
+        };
+
+        window.downloadAllSystemData = function() {
+            if (!calculatedData.A || !calculatedData.B || !calculatedData.Edna) {
+                alert("Paki-kumpyutin muna ang bill bago i-download ang data.");
+                return;
+            }
+
+            let now = new Date();
+            let reportContent = `==================================================\n`;
+            reportContent += `       MAYNILAD WATER BILL SYSTEM REPORT\n`;
+            reportContent += `==================================================\n`;
+            reportContent += `Billing Month: ${calculatedData.billingMonth}\n`;
+            reportContent += `Petsa at Oras: ${now.toLocaleString('fil-PH')}\n`;
+            reportContent += `Service Address: ${SERVICE_ADDRESS}\n`;
+            reportContent += `--------------------------------------------------\n\n`;
+
+            ['A', 'B', 'Edna'].forEach((key, idx) => {
+                const person = calculatedData[key];
+                const hist = paymentHistoryByKey[key] || [];
+                reportContent += `[ ${idx + 1} ] Account Name: ${person.accountName}\n`;
+                reportContent += `    Present Reading : ${person.pres}\n`;
+                reportContent += `    Previous Reading: ${person.prev}\n`;
+                reportContent += `    Consumption Qty : ${person.cum.toFixed(3)} cu. m.\n`;
+                reportContent += `    TOTAL AMOUNT    : ₱${person.total.toFixed(2)}\n`;
+                reportContent += `    Payment History :\n`;
+                if (hist.length === 0) {
+                    reportContent += `      - Walang nakaraang bayad\n`;
+                } else {
+                    hist.slice(0, 3).forEach(h => {
+                        reportContent += `      - Amount: ₱${Number(h.amount).toFixed(2)} | OR#: ${h.orNumber} | Date: ${h.payDate}\n`;
+                    });
+                }
+                reportContent += `\n`;
+            });
+
+            reportContent += `--------------------------------------------------\n`;
+            reportContent += `DEVELOPER: Franklin Nesperos\n`;
+            reportContent += `==================================================\n`;
+
+            let blob = new Blob([reportContent], { type: 'text/plain;charset=utf-8;' });
+            let link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = `Maynilad_Report_All3_${now.toISOString().slice(0, 10)}.txt`;
+            link.click();
         };
 
         window.requestResetWithPin = function() {
@@ -496,94 +679,13 @@
                 alert("May error sa pag-reset.");
             }
         }
-
-        window.downloadAllSystemData = function() {
-            if (!calculatedData.A || !calculatedData.B || !calculatedData.Edna) {
-                alert("Paki-kumpyutin muna ang bill bago i-download ang data.");
-                return;
-            }
-
-            let now = new Date();
-            let reportContent = `=========================================\n`;
-            reportContent += `   MAYNILAD WATER BILL SYSTEM REPORT\n`;
-            reportContent += `=========================================\n`;
-            reportContent += `Petsa at Oras: ${now.toLocaleString('fil-PH')}\n`;
-            reportContent += `Service Address: ${SERVICE_ADDRESS}\n`;
-            reportContent += `-----------------------------------------\n\n`;
-
-            [calculatedData.A, calculatedData.B, calculatedData.Edna].forEach((person, idx) => {
-                reportContent += `[ ${idx + 1} ] Account Name: ${person.accountName}\n`;
-                reportContent += ` - Present Reading: ${person.pres} | Previous Reading: ${person.prev}\n`;
-                reportContent += ` - Consumption Qty: ${person.cum.toFixed(3)} cu.m. | Total Bill: ₱${person.total.toFixed(2)}\n\n`;
-            });
-
-            reportContent += `-----------------------------------------\nDEVELOPER: Franklin Nesperos\n=========================================\n`;
-
-            let blob = new Blob([reportContent], { type: 'text/plain;charset=utf-8;' });
-            let link = document.createElement('a');
-            link.href = URL.createObjectURL(blob);
-            link.download = `Maynilad_Report_${now.toISOString().slice(0, 10)}.txt`;
-            link.click();
-        };
-
-        window.saveReceiptImage = function(key) {
-            let item = calculatedData[key];
-            if (!item) return;
-
-            document.getElementById('rBillingMonth').innerText = calculatedData.billingMonth || "";
-            document.getElementById('rAccountName').innerText = item.accountName;
-            document.getElementById('rServiceAddress').innerText = item.serviceAddress;
-
-            document.getElementById('rPresentReading').innerText = item.pres;
-            document.getElementById('rPreviousReading').innerText = item.prev;
-            document.getElementById('rConsumptionQty').innerText = item.cum.toFixed(3);
-
-            const historyRows = paymentHistoryByKey[key] || [];
-            let historyTbodyHtml = "";
-            if (historyRows.length === 0) {
-                historyTbodyHtml = `
-                    <tr>
-                        <td style="text-align:left;">0.00</td>
-                        <td style="text-align:center;">---</td>
-                        <td style="text-align:right;">---</td>
-                    </tr>
-                `;
-            } else {
-                historyRows.slice(0, 4).forEach((entry) => {
-                    historyTbodyHtml += `
-                        <tr>
-                            <td style="text-align:left;">${Number(entry.amount).toFixed(2)}</td>
-                            <td style="text-align:center;">${entry.orNumber}</td>
-                            <td style="text-align:right;">${entry.payDate}</td>
-                        </tr>
-                    `;
-                });
-            }
-            document.getElementById('rPaymentHistoryBody').innerHTML = historyTbodyHtml;
-            document.getElementById('rTotalAmount').innerText = "₱" + item.total.toFixed(2);
-
-            let receiptElement = document.getElementById('receiptCardToPrint');
-            receiptElement.style.left = '0';
-            receiptElement.style.top = '0';
-
-            html2canvas(receiptElement, { scale: 2 }).then(canvas => {
-                receiptElement.style.left = '-9999px';
-                let link = document.createElement('a');
-                link.download = `Resibo_${item.accountName.replace(/\s+/g, '_')}.png`;
-                link.href = canvas.toDataURL('image/png');
-                link.click();
-            });
-        };
     </script>
 
     <style>
         :root {
             --primary: #0275d8;
-            --primary-hover: #025aa5;
             --danger: #d9534f;
-            --danger-hover: #c9302c;
             --success: #28a745;
-            --success-hover: #218838;
             --bg-color: #f4f7f6;
             --card-bg: #ffffff;
             --text-color: #333333;
@@ -656,9 +758,7 @@
             .grid-2, .grid-3 { grid-template-columns: 1fr; }
         }
 
-        .form-group {
-            margin-bottom: 15px;
-        }
+        .form-group { margin-bottom: 15px; }
 
         label {
             display: block;
@@ -676,13 +776,6 @@
             font-size: 15px;
             color: #000;
             background: #fff;
-        }
-
-        .meter-input-wrapper {
-            position: relative;
-            display: flex;
-            align-items: center;
-            width: 100%;
         }
 
         .meter-input-wrapper input {
@@ -753,6 +846,29 @@
             font-weight: bold;
         }
 
+        .action-buttons-stack {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 14px;
+        }
+
+        @media (max-width: 600px) {
+            .action-buttons-stack { grid-template-columns: 1fr; }
+        }
+
+        .btn-print-all {
+            width: 100%;
+            background-color: #17a2b8;
+            color: white;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
         .btn-download-all {
             width: 100%;
             background-color: var(--success);
@@ -760,10 +876,9 @@
             padding: 12px;
             border: none;
             border-radius: 8px;
-            font-size: 15px;
+            font-size: 14px;
             cursor: pointer;
             font-weight: bold;
-            margin-top: 12px;
         }
 
         .result-box {
@@ -1018,66 +1133,119 @@
             letter-spacing: 1px;
         }
 
-        /* --- MAYNILAD STYLE RECEIPT LAYOUT (WALANG RATE BREAKDOWN) --- */
-        .receipt-card {
+        /* --- 3" x 5" MAYNILAD-STYLE RECEIPT DESIGN --- */
+        .receipt-box-3x5 {
+            width: 3in;
+            min-height: 5in;
+            box-sizing: border-box;
             background: #ffffff;
-            border: 1px solid #222;
-            padding: 20px;
-            width: 370px;
+            border: 1.5px solid #111;
+            padding: 12px 10px;
             font-family: 'Courier New', Courier, monospace;
             color: #111;
+            font-size: 10.5px;
+            line-height: 1.35;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .single-capture-hidden {
             position: absolute;
             left: -9999px;
             top: 0;
-            font-size: 12px;
-            line-height: 1.4;
         }
 
         .rcpt-center { text-align: center; }
         .rcpt-bold { font-weight: bold; }
-        .rcpt-title { font-size: 15px; font-weight: bold; letter-spacing: 0.5px; }
+        .rcpt-title { font-size: 12.5px; font-weight: bold; letter-spacing: 0.3px; }
+        .rcpt-line { margin-bottom: 3px; word-break: break-word; }
+
         .rcpt-sec-hdr {
             text-align: center;
             font-weight: bold;
-            margin: 10px 0 6px 0;
-            border-top: 1px dashed #333;
-            border-bottom: 1px dashed #333;
-            padding: 3px 0;
-            font-size: 11px;
+            margin: 7px 0 5px 0;
+            border-top: 1px dashed #222;
+            border-bottom: 1px dashed #222;
+            padding: 2px 0;
+            font-size: 10px;
         }
-        .rcpt-row {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 3px;
-        }
+
         .rcpt-table {
             width: 100%;
             border-collapse: collapse;
-            margin-top: 4px;
+            margin-top: 2px;
             background: transparent;
             border-radius: 0;
         }
+
         .rcpt-table th {
             background: transparent;
             color: #111;
-            border-bottom: 1px solid #333;
-            padding: 3px 2px;
-            font-size: 11px;
+            border-bottom: 1px solid #222;
+            padding: 2px 1px;
+            font-size: 9.5px;
         }
+
         .rcpt-table td {
-            border-bottom: 1px dotted #999;
-            padding: 3px 2px;
-            font-size: 11px;
+            border-bottom: 1px dotted #888;
+            padding: 3px 1px;
+            font-size: 9.5px;
         }
+
         .rcpt-total-box {
-            margin-top: 10px;
-            border-top: 2px solid #111;
-            border-bottom: 2px solid #111;
-            padding: 6px 4px;
+            margin-top: 8px;
+            border-top: 1.5px solid #111;
+            border-bottom: 1.5px solid #111;
+            padding: 5px 2px;
             display: flex;
             justify-content: space-between;
-            font-size: 14px;
+            font-size: 12.5px;
             font-weight: bold;
+        }
+
+        .rcpt-footer-note {
+            text-align: center;
+            font-size: 9px;
+            margin-top: 6px;
+            color: #444;
+        }
+
+        /* --- A4 PRINT SHEET (3 RECEIPTS TOGETHER) --- */
+        #a4PrintSheet {
+            display: none;
+        }
+
+        @page {
+            size: A4 portrait;
+            margin: 0.35in;
+        }
+
+        @media print {
+            body {
+                background: #fff !important;
+                padding: 0 !important;
+                margin: 0 !important;
+            }
+            .container,
+            .keypad-popup,
+            .pin-modal,
+            .history-modal,
+            #singleReceiptCapture {
+                display: none !important;
+            }
+            #a4PrintSheet {
+                display: grid !important;
+                grid-template-columns: repeat(2, 3in);
+                gap: 0.35in;
+                justify-content: center;
+                align-content: start;
+                width: 100%;
+            }
+            .receipt-box-3x5 {
+                page-break-inside: avoid;
+                break-inside: avoid;
+            }
         }
     </style>
 </head>
@@ -1198,6 +1366,7 @@
             <button type="button" class="btn-save-paid" onclick="recordPaidEntry()">✔ SAVE PAID & GENERATE OR#</button>
         </div>
         <div id="paymentRecordStatus" style="margin-top:8px; font-size:0.85em; color:#004085;"></div>
+        <div id="savedPaymentsPreview" style="margin-top:8px; font-size:0.85em; color:#333;"></div>
     </div>
 
     <div class="btn-group">
@@ -1215,13 +1384,16 @@
                     <th>Account Name</th>
                     <th>Consumption (cu.m.)</th>
                     <th>Total Amount (₱)</th>
-                    <th>Aksyon (Resibo)</th>
+                    <th>Individual (.PNG)</th>
                 </tr>
             </thead>
             <tbody id="tableBody"></tbody>
         </table>
 
-        <button type="button" class="btn-download-all" onclick="downloadAllSystemData()">DOWNLOAD ALL SYSTEM DATA (.TXT)</button>
+        <div class="action-buttons-stack">
+            <button type="button" class="btn-print-all" onclick="printAllThreeReceiptsA4()">🖨️ PRINT ALL 3 RECEIPTS (1 A4 PAGE)</button>
+            <button type="button" class="btn-download-all" onclick="downloadAllSystemData()">📥 DOWNLOAD ALL DATA (.TXT)</button>
+        </div>
     </div>
 
     <div class="footer">
@@ -1303,49 +1475,14 @@
     </div>
 </div>
 
-<!-- MAYNILAD-STYLE RECEIPT CARD (WALANG RATE / WALANG PESO PER CU.M. SA GITNA) -->
-<div id="receiptCardToPrint" class="receipt-card">
-    <div class="rcpt-center rcpt-title">MAYNILAD SUB-BILL STATEMENT</div>
-    <div class="rcpt-center" style="font-size:11px;">For the month of: <span id="rBillingMonth"></span></div>
+<!-- HIDDEN SINGLE RECEIPT FOR INDIVIDUAL .PNG CAPTURE (3" x 5") -->
+<div id="singleReceiptCapture" class="receipt-box-3x5 single-capture-hidden"></div>
 
-    <div class="rcpt-sec-hdr">SERVICE INFORMATION</div>
-    <div><span class="rcpt-bold">Account Name:</span> <span id="rAccountName"></span></div>
-    <div><span class="rcpt-bold">Service Address:</span> <span id="rServiceAddress"></span></div>
-
-    <div class="rcpt-sec-hdr">METERING INFORMATION</div>
-    <table class="rcpt-table">
-        <thead>
-            <tr>
-                <th style="text-align:left;">Present Reading</th>
-                <th style="text-align:center;">Previous Reading</th>
-                <th style="text-align:right;">Consumption Qty</th>
-            </tr>
-        </thead>
-        <tbody>
-            <tr>
-                <td id="rPresentReading" style="text-align:left; font-weight:bold;"></td>
-                <td id="rPreviousReading" style="text-align:center; font-weight:bold;"></td>
-                <td style="text-align:right; font-weight:bold;"><span id="rConsumptionQty"></span> cu. m.</td>
-            </tr>
-        </tbody>
-    </table>
-
-    <div class="rcpt-sec-hdr">PAYMENT HISTORY</div>
-    <table class="rcpt-table">
-        <thead>
-            <tr>
-                <th style="text-align:left;">Total Amount</th>
-                <th style="text-align:center;">Official Receipt</th>
-                <th style="text-align:right;">Date</th>
-            </tr>
-        </thead>
-        <tbody id="rPaymentHistoryBody"></tbody>
-    </table>
-
-    <div class="rcpt-total-box">
-        <span>TOTAL AMOUNT</span>
-        <span id="rTotalAmount"></span>
-    </div>
+<!-- A4 PRINT SHEET CONTAINING ALL 3 RECEIPTS (3" x 5" EACH) -->
+<div id="a4PrintSheet">
+    <div id="printSlotA" class="receipt-box-3x5"></div>
+    <div id="printSlotB" class="receipt-box-3x5"></div>
+    <div id="printSlotEdna" class="receipt-box-3x5"></div>
 </div>
 
 </body>
